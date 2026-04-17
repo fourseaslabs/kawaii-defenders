@@ -1,0 +1,2966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kawaii Defenders Academy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream:#FFF8EC; --peach:#FFB8A0; --mint:#A8E6CF; --lavender:#C7B8EA;
+  --rose:#FF8FB8; --sky:#A0D8F0; --sun:#FFD66B; --ink:#3D2E3F;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { height:100%; overscroll-behavior:none; }
+body {
+  font-family:'Nunito',sans-serif;
+  background:
+    radial-gradient(circle at 20% 10%, #FFE0EC 0%, transparent 45%),
+    radial-gradient(circle at 80% 85%, #D4F0FF 0%, transparent 45%),
+    radial-gradient(circle at 60% 40%, #FFF4D4 0%, transparent 50%),
+    #FFF8EC;
+  color:var(--ink);
+  min-height:100vh;
+  overflow:hidden;
+  position:relative;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='0.9'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.06'/></svg>");
+  pointer-events:none; z-index:1;
+}
+#app { position:relative; width:100vw; height:100vh; height:100dvh; overflow:hidden; z-index:2; }
+
+/* HUD */
+.hud { position:absolute; top:0; left:0; right:0; padding:10px 12px;
+  display:flex; justify-content:space-between; align-items:center; gap:6px; z-index:10; }
+.hud-pill { background:white; border:3px solid var(--ink); border-radius:999px; padding:5px 12px;
+  font-family:'Fredoka',sans-serif; font-weight:600; font-size:14px;
+  box-shadow:0 3px 0 var(--ink); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.hud-pill.lives{color:#D14D6A;} .hud-pill.coins{color:#D19700;} .hud-pill.wave{color:#6B4FA0;}
+.hud-pill.level{color:#2B9B63;}
+
+#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
+
+/* Send wave */
+.send-wave-btn { position:absolute; bottom:86px; left:50%; transform:translateX(-50%);
+  background:var(--rose); color:white; border:4px solid var(--ink); border-radius:18px;
+  padding:10px 28px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:1.2px; box-shadow:0 5px 0 var(--ink); cursor:pointer; z-index:11;
+  text-shadow:2px 2px 0 rgba(0,0,0,0.15); animation:pulseBtn 1.8s ease-in-out infinite; }
+.send-wave-btn:active { transform:translateX(-50%) translateY(3px); box-shadow:0 2px 0 var(--ink); }
+.send-wave-btn.hidden { display:none; }
+@keyframes pulseBtn { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.05);} }
+
+/* Back button */
+.back-btn { background:white; border:3px solid var(--ink); border-radius:999px;
+  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 3px 0 var(--ink); font-size:16px; cursor:pointer; padding:0;
+  font-family:'Fredoka',sans-serif; font-weight:700; flex-shrink:0; }
+.back-btn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+.back-btn.floating { position:absolute; z-index:12; }
+
+/* Tower bar */
+.tower-bar { position:absolute; bottom:10px; left:8px; right:8px;
+  background:white; border:3px solid var(--ink); border-radius:18px; padding:6px;
+  box-shadow:0 4px 0 var(--ink); display:flex; gap:4px; z-index:10;
+  justify-content:space-around; align-items:center; }
+.tower-chip { flex:1; background:var(--cream); border:2px solid var(--ink); border-radius:11px;
+  padding:4px 1px 3px; text-align:center; cursor:pointer; font-family:'Fredoka',sans-serif;
+  transition:transform 0.15s, background 0.15s, box-shadow 0.15s; position:relative; min-width:0; }
+.tower-chip:active { transform:scale(0.94); }
+.tower-chip.selected { background:var(--sun); transform:translateY(-3px); box-shadow:0 3px 0 var(--ink); }
+.tower-chip.disabled { opacity:0.45; }
+.tower-chip .emoji { font-size:18px; display:block; line-height:1; }
+.tower-chip .cost { font-size:9px; color:#A87400; font-weight:700; margin-top:1px; }
+
+/* Tower upgrade popup */
+.tower-popup { position:absolute; inset:0; background:rgba(61,46,63,0.4);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  z-index:55; display:flex; align-items:center; justify-content:center; padding:16px;
+  animation:fadeIn 0.2s ease; }
+.tower-card { background:white; border:4px solid var(--ink); border-radius:22px;
+  padding:18px 18px 14px; box-shadow:0 7px 0 var(--ink); max-width:300px; width:100%;
+  animation:popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.tower-emoji { text-align:center; font-size:54px; line-height:1; margin-bottom:2px; animation:wiggle 0.6s ease; }
+.tower-name { text-align:center; font-family:'Fredoka',sans-serif; font-weight:700; font-size:20px; }
+.tower-lvl { text-align:center; font-family:'Fredoka',sans-serif; font-size:12px;
+  color:#6B4FA0; letter-spacing:1.5px; text-transform:uppercase; margin:2px 0 10px; }
+.tower-stats { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0 14px; }
+.tower-stat { background:var(--cream); border:2px solid var(--ink); border-radius:10px;
+  padding:6px; text-align:center; font-family:'Fredoka',sans-serif; font-size:13px; }
+.tower-stat b { color:#6B4FA0; }
+.tower-btns { display:flex; gap:8px; flex-direction:column; }
+.tower-btn { border:3px solid var(--ink); border-radius:14px; padding:10px 14px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:16px; cursor:pointer;
+  box-shadow:0 4px 0 var(--ink); transition:transform 0.1s, box-shadow 0.1s;
+  display:flex; justify-content:space-between; align-items:center; }
+.tower-btn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.tower-btn.upgrade { background:var(--mint); }
+.tower-btn.sell { background:#FFD6D6; }
+.tower-btn.close { background:white; font-size:14px; padding:8px; }
+.tower-btn.disabled { opacity:0.4; pointer-events:none; }
+
+/* Quiz overlay */
+.quiz-overlay { position:absolute; inset:0;
+  background:
+    radial-gradient(circle at 30% 20%, #FFE0EC 0%, transparent 55%),
+    radial-gradient(circle at 70% 80%, #D4F0FF 0%, transparent 55%),
+    #FFF8EC;
+  z-index:60; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:20px 16px; animation:fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+.quiz-banner { font-family:'Fredoka',sans-serif; font-weight:700; font-size:28px;
+  color:var(--ink); text-shadow:3px 3px 0 var(--sun); margin-bottom:4px; text-align:center;
+  animation:dropIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes dropIn { from{transform:translateY(-30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+.quiz-progress { font-family:'Fredoka',sans-serif; font-weight:600; font-size:13px;
+  color:#7A6A7C; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; }
+.quiz-dots { display:flex; gap:6px; margin-bottom:16px; }
+.quiz-dot { width:12px; height:12px; border-radius:999px; background:#EEE; border:2px solid var(--ink);
+  transition:transform 0.2s, background 0.2s; }
+.quiz-dot.done{background:var(--mint);} .quiz-dot.current{background:var(--sun); transform:scale(1.25);} .quiz-dot.wrong{background:var(--peach);}
+
+.question-card { background:white; border:4px solid var(--ink); border-radius:26px;
+  padding:18px 16px; box-shadow:0 7px 0 var(--ink); max-width:340px; width:100%;
+  animation:popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes popIn { from{transform:scale(0.5); opacity:0;} to{transform:scale(1); opacity:1;} }
+.q-tower { font-size:44px; text-align:center; line-height:1; animation:wiggle 0.7s ease; }
+@keyframes wiggle { 0%,100%{transform:rotate(0);} 25%{transform:rotate(-10deg);} 75%{transform:rotate(10deg);} }
+.q-subject { text-align:center; font-family:'Fredoka',sans-serif; font-weight:600;
+  color:#888; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; margin-top:2px; }
+.q-source { text-align:center; font-family:'Fredoka',sans-serif; font-weight:500;
+  color:#6B4FA0; font-size:11px; margin-top:4px;
+  background:#F3EEFA; border-radius:10px; padding:3px 10px;
+  display:inline-block; position:relative; left:50%; transform:translateX(-50%);
+  border:1.5px solid #C7B8EA; }
+.q-review { text-align:center; font-family:'Fredoka',sans-serif; font-weight:700;
+  color:white; font-size:11px; letter-spacing:1px;
+  background:var(--rose); border:2px solid #C14777; border-radius:999px;
+  padding:4px 12px; margin:-6px auto 8px; display:inline-block;
+  position:relative; left:50%; transform:translateX(-50%);
+  box-shadow:0 2px 0 #C14777;
+  animation:reviewPulse 1.8s ease-in-out infinite; }
+@keyframes reviewPulse {
+  0%,100% { transform:translateX(-50%) scale(1); }
+  50% { transform:translateX(-50%) scale(1.06); }
+}
+.hint-btn {
+  display:block; margin:6px auto 8px; padding:6px 16px;
+  background:#FFF8E1; border:2.5px solid #F9A825; border-radius:999px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:13px;
+  color:#E65100; cursor:pointer; box-shadow:0 3px 0 #F9A825;
+  transition:transform 0.15s; }
+.hint-btn:active { transform:translateY(2px); box-shadow:0 1px 0 #F9A825; }
+.hint-reveal {
+  margin:0 auto 10px; padding:8px 12px;
+  background:#FFF8E1; border:2px solid #FFD54F; border-radius:12px;
+  font-family:'Fredoka',sans-serif; font-weight:500; font-size:13px;
+  color:#5D4037; text-align:center; line-height:1.4;
+  animation:revealPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.q-text { font-family:'Fredoka',sans-serif; font-weight:600; font-size:24px;
+  text-align:center; margin:10px 0 14px; line-height:1.3; }
+.q-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.q-option { background:var(--cream); border:3px solid var(--ink); border-radius:14px;
+  padding:12px 6px; font-family:'Fredoka',sans-serif; font-weight:600; font-size:19px;
+  cursor:pointer; transition:transform 0.1s, box-shadow 0.1s, background 0.2s;
+  box-shadow:0 4px 0 var(--ink); color:var(--ink); min-height:52px; }
+.q-option:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.q-option.correct { background:var(--mint); animation:sparkle 0.5s; }
+.q-option.wrong { background:#FFB8A0; animation:shake 0.4s; }
+@keyframes sparkle { 0%{transform:scale(1);} 40%{transform:scale(1.18);} 100%{transform:scale(1);} }
+@keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-8px);} 75%{transform:translateX(8px);} }
+
+.correct-reveal {
+  margin-top:12px; padding:8px 14px;
+  background:#E8F5E9; border:2.5px solid #2B9B63; border-radius:12px;
+  font-family:'Fredoka',sans-serif; font-weight:600; font-size:15px;
+  color:#1B5E20; text-align:center;
+  animation:revealPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.correct-reveal b { color:#2B9B63; font-size:18px; }
+.correct-reveal .exp-text {
+  display:block; margin-top:6px;
+  font-size:13px; font-weight:500; color:#2E7D32; line-height:1.4;
+}
+@keyframes revealPop { from{transform:scale(0.5); opacity:0;} to{transform:scale(1); opacity:1;} }
+
+/* Study cards */
+.study-overlay { position:absolute; inset:0;
+  background:
+    radial-gradient(circle at 30% 20%, #E8F5E9 0%, transparent 55%),
+    radial-gradient(circle at 70% 80%, #FFF8E1 0%, transparent 55%),
+    #FFF8EC;
+  z-index:60; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:20px 16px; animation:fadeIn 0.3s ease; }
+.study-banner { font-family:'Fredoka',sans-serif; font-weight:700; font-size:24px;
+  color:var(--ink); text-shadow:3px 3px 0 #A8E6CF; margin-bottom:4px; text-align:center; }
+.study-sub { font-family:'Fredoka',sans-serif; font-weight:600; font-size:12px;
+  color:#7A6A7C; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:14px; }
+.study-card { background:white; border:4px solid var(--ink); border-radius:26px;
+  padding:18px 16px; box-shadow:0 7px 0 var(--ink); max-width:340px; width:100%;
+  animation:popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); margin-bottom:14px; }
+.study-card .study-icon { text-align:center; font-size:44px; line-height:1; margin-bottom:4px; }
+.study-card .study-q { font-family:'Fredoka',sans-serif; font-weight:600; font-size:20px;
+  text-align:center; margin-bottom:8px; color:var(--ink); }
+.study-card .study-answer { font-family:'Fredoka',sans-serif; font-weight:700; font-size:26px;
+  text-align:center; color:#2B9B63; margin-bottom:6px; }
+.study-card .study-exp { font-family:'Fredoka',sans-serif; font-weight:500; font-size:14px;
+  text-align:center; color:#4A3D4C; line-height:1.5; padding:8px 4px;
+  background:#F1F8E9; border-radius:12px; border:2px solid #C8E6C9; }
+.study-card .study-source { text-align:center; font-family:'Fredoka',sans-serif; font-weight:500;
+  color:#6B4FA0; font-size:10px; margin-top:6px; }
+.study-progress { display:flex; gap:6px; margin-bottom:12px; }
+.study-pip { width:10px; height:10px; border-radius:50%; background:#ddd; border:2px solid var(--ink); }
+.study-pip.active { background:var(--sun); transform:scale(1.2); }
+.study-pip.done { background:var(--mint); }
+
+.summary-big { font-size:64px; margin-bottom:4px; animation:bounce 1.4s ease-in-out infinite; display:inline-block; }
+@keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+.summary-title { font-family:'Fredoka',sans-serif; font-weight:700; font-size:30px; margin-bottom:8px;
+  text-shadow:3px 3px 0 var(--sun); text-align:center; }
+.summary-stats { font-family:'Fredoka',sans-serif; font-size:16px; color:#4A3D4C;
+  text-align:center; line-height:1.6; margin-bottom:6px; }
+.reward-line { font-family:'Fredoka',sans-serif; font-weight:700; font-size:20px; color:#D19700; margin:4px 0; }
+.bonus-line { font-family:'Fredoka',sans-serif; font-weight:700; font-size:18px; color:#2B9B63;
+  margin:4px 0 16px; animation:bonusPulse 0.8s ease infinite; }
+@keyframes bonusPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+
+/* Screens */
+.screen { position:absolute; inset:0;
+  background:
+    radial-gradient(circle at 20% 10%, #FFE0EC 0%, transparent 45%),
+    radial-gradient(circle at 80% 85%, #D4F0FF 0%, transparent 45%),
+    #FFF8EC;
+  z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:18px 16px; overflow-y:auto; }
+.screen.hidden { display:none; }
+.title { font-family:'Fredoka',sans-serif; font-weight:700; font-size:42px; color:var(--ink);
+  text-align:center; line-height:0.95; letter-spacing:-1px; text-shadow:4px 4px 0 var(--sun); margin-bottom:4px; }
+.subtitle { font-family:'Fredoka',sans-serif; font-weight:500; font-size:13px; color:#7A6A7C;
+  margin-bottom:14px; text-align:center; }
+.mascots { display:flex; gap:6px; margin-bottom:10px; font-size:30px; flex-wrap:wrap; justify-content:center; }
+.mascots span { display:inline-block; animation:bounce 2s ease-in-out infinite; }
+.mascots span:nth-child(2){animation-delay:0.15s;}
+.mascots span:nth-child(3){animation-delay:0.3s;}
+.mascots span:nth-child(4){animation-delay:0.45s;}
+.mascots span:nth-child(5){animation-delay:0.6s;}
+.mascots span:nth-child(6){animation-delay:0.75s;}
+.mascots span:nth-child(7){animation-delay:0.9s;}
+.mascots span:nth-child(8){animation-delay:1.05s;}
+
+.label { font-family:'Fredoka',sans-serif; font-weight:600; font-size:12px; color:#7A6A7C;
+  letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; margin-top:4px; }
+
+.level-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; width:100%; max-width:360px; margin-bottom:14px; }
+.level-card { background:white; border:3px solid var(--ink); border-radius:16px; padding:12px 4px 10px;
+  text-align:center; cursor:pointer; box-shadow:0 5px 0 var(--ink); font-family:'Fredoka',sans-serif;
+  position:relative;
+  transition:transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+.level-card > .code, .level-card > .age { pointer-events:none; }
+.level-card:active { transform:translateY(2px); box-shadow:0 3px 0 var(--ink); }
+.level-card .code { font-weight:700; font-size:22px; line-height:1.1; transition:font-size 0.2s; }
+.level-card.selected .code { font-size:24px; }
+.level-card .age { font-size:10px; color:#7A6A7C; margin-top:2px; font-weight:600; letter-spacing:0.5px; }
+
+.subject-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; max-width:340px; margin-bottom:18px; }
+.subject-card { background:white; border:3px solid var(--ink); border-radius:18px; padding:14px 6px 10px;
+  text-align:center; cursor:pointer; box-shadow:0 5px 0 var(--ink); font-family:'Fredoka',sans-serif;
+  transition:transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  position:relative; min-height:82px; }
+.subject-card > .emoji, .subject-card > .name, .subject-card > .sub { pointer-events:none; }
+.subject-card:active { transform:translateY(2px); box-shadow:0 3px 0 var(--ink); }
+.subject-card .emoji { font-size:30px; display:block; margin-bottom:3px; line-height:1; transition:transform 0.2s; }
+.subject-card.selected .emoji { transform:scale(1.15); }
+.subject-card .name { font-weight:700; font-size:15px; line-height:1.1; }
+.subject-card .sub { font-size:10px; color:#7A6A7C; margin-top:2px; font-weight:500; }
+
+/* Real DOM badge (not a pseudo) — JS toggles display:flex when selected */
+.check-badge {
+  position:absolute;
+  top:-10px;
+  right:-10px;
+  width:26px;
+  height:26px;
+  background:#3D2E3F;
+  color:white;
+  border-radius:50%;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:15px;
+  border:3px solid white;
+  box-shadow:0 3px 0 rgba(61,46,63,0.3);
+  z-index:10;
+  pointer-events:none;
+  font-family:sans-serif;
+}
+
+.start-btn { background:var(--rose); color:white; border:4px solid var(--ink); border-radius:20px;
+  padding:12px 36px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:20px;
+  cursor:pointer; box-shadow:0 6px 0 var(--ink);
+  transition:transform 0.15s, box-shadow 0.15s, background 0.3s, color 0.2s;
+  letter-spacing:1.5px; text-shadow:2px 2px 0 rgba(0,0,0,0.15); position:relative; }
+.start-btn:active { transform:translateY(4px); box-shadow:0 2px 0 var(--ink); }
+
+/* Secondary button for modal (smaller, neutral style) */
+.secondary-btn { background:white; color:var(--ink); border:3px solid var(--ink); border-radius:14px;
+  padding:8px 20px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:14px;
+  cursor:pointer; box-shadow:0 4px 0 var(--ink);
+  transition:transform 0.15s, box-shadow 0.15s;
+  letter-spacing:0.5px; }
+.secondary-btn:active { transform:translateY(2px); box-shadow:0 2px 0 var(--ink); }
+
+/* Mode selection grid */
+.mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:320px; margin-top:8px; }
+.mode-card { background:white; border:4px solid var(--ink); border-radius:22px; padding:20px 10px 16px;
+  text-align:center; cursor:pointer; box-shadow:0 6px 0 var(--ink); font-family:'Fredoka',sans-serif;
+  transition:transform 0.15s, box-shadow 0.15s, background 0.2s; position:relative; }
+.mode-card:active { transform:translateY(4px); box-shadow:0 2px 0 var(--ink); }
+.mode-card .mode-icon { font-size:52px; line-height:1; margin-bottom:6px; }
+.mode-card .mode-name { font-weight:700; font-size:22px; line-height:1; margin-bottom:4px; }
+.mode-card .mode-desc { font-size:11px; color:#7A6A7C; font-weight:500; line-height:1.4; }
+.mode-card[data-mode="kids"]:hover, .mode-card[data-mode="kids"]:active { background:#FFF0E8; }
+.mode-card[data-mode="adults"]:hover, .mode-card[data-mode="adults"]:active { background:#E8F0FF; }
+
+/* Locked/coming soon badges */
+.coming-soon { position:relative; }
+.coming-soon::after { content:'COMING SOON'; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%) rotate(-8deg);
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:10px;
+  background:var(--rose); color:white; padding:3px 10px; border-radius:999px;
+  letter-spacing:1.5px; border:2px solid #C14777; box-shadow:0 2px 0 #C14777; z-index:3; }
+.coming-soon > * { opacity:0.35; }
+
+/* Start button reflects the selected subject color */
+.start-btn[data-subject="math"]    { background:var(--mint);     color:var(--ink); text-shadow:2px 2px 0 rgba(255,255,255,0.5); }
+.start-btn[data-subject="english"] { background:var(--sky);      color:var(--ink); text-shadow:2px 2px 0 rgba(255,255,255,0.5); }
+.start-btn[data-subject="chinese"] { background:var(--rose);     color:white;      text-shadow:2px 2px 0 rgba(0,0,0,0.2); }
+.start-btn[data-subject="mixed"]   { background:var(--sun);      color:var(--ink); text-shadow:2px 2px 0 rgba(255,255,255,0.5); }
+
+.hint { position:absolute; top:60px; left:12px; right:12px;
+  background:white; border:2.5px solid var(--ink); border-radius:13px; padding:7px 12px;
+  font-family:'Fredoka',sans-serif; font-size:13px; font-weight:500; color:var(--ink);
+  box-shadow:0 3px 0 var(--ink); z-index:10; text-align:center; animation:slideDown 0.3s ease; }
+@keyframes slideDown { from{transform:translateY(-20px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+
+.phase-banner { position:absolute; top:50px; left:50%; transform:translateX(-50%);
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:12px;
+  background:var(--ink); color:white; border-radius:999px; padding:4px 14px;
+  z-index:9; letter-spacing:1px; box-shadow:0 3px 0 rgba(0,0,0,0.2); white-space:nowrap; }
+
+/* Sound toggles */
+.sound-controls { position:absolute; top:52px; right:12px; display:flex; flex-direction:column; gap:6px; z-index:11; }
+.sound-btn { width:34px; height:34px; background:white; border:2.5px solid var(--ink);
+  border-radius:999px; box-shadow:0 3px 0 var(--ink); display:flex; align-items:center; justify-content:center;
+  font-size:15px; cursor:pointer; transition:transform 0.1s, opacity 0.15s; padding:0; line-height:1;
+  position:relative; overflow:hidden; }
+.sound-btn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+.sound-btn.off { opacity:0.5; background:#F0EBE0; overflow:visible; }
+.sound-btn.off::after { content:''; position:absolute; width:24px; height:2.5px;
+  background:var(--ink); transform:rotate(-35deg); border-radius:2px; }
+
+/* Journey map - redesigned */
+.journey-header { position:sticky; top:0; z-index:5;
+  background:linear-gradient(180deg, #FFF8EC 0%, #FFF8EC 75%, rgba(255,248,236,0) 100%);
+  padding:14px 16px 18px; text-align:center; width:100%; flex-shrink:0; }
+.journey-title { font-family:'Fredoka',sans-serif; font-weight:700; font-size:24px;
+  color:var(--ink); text-shadow:3px 3px 0 var(--sun); }
+.journey-sub { font-family:'Fredoka',sans-serif; font-size:11px; color:#7A6A7C;
+  letter-spacing:1.5px; text-transform:uppercase; margin-top:3px; font-weight:600; }
+
+/* Legend row under header */
+.journey-legend { display:flex; gap:6px; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+.legend-chip { display:inline-flex; align-items:center; gap:5px;
+  font-family:'Fredoka',sans-serif; font-size:10px; font-weight:600; color:var(--ink);
+  background:white; border:2px solid var(--ink); border-radius:999px;
+  padding:3px 9px; box-shadow:0 2px 0 var(--ink); }
+.legend-swatch { width:10px; height:10px; border-radius:50%; border:1.5px solid var(--ink); }
+
+.journey-map { position:relative; margin:8px auto 140px; }
+
+.journey-svg { position:absolute; top:0; left:0; width:100%; height:100%;
+  pointer-events:none; z-index:1; }
+
+.journey-node {
+  position:absolute;
+  width:68px; height:68px;
+  border-radius:50%;
+  border:4px solid var(--ink);
+  background:white;
+  box-shadow:0 5px 0 var(--ink);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; font-family:'Fredoka',sans-serif;
+  transform:translate(-50%, -50%);
+  z-index:2; transition:box-shadow 0.1s;
+}
+.journey-node:active { box-shadow:0 2px 0 var(--ink); }
+.journey-node .n-num {
+  font-weight:700; font-size:22px; color:var(--ink); line-height:1;
+}
+.journey-node .n-stars {
+  display:flex; gap:1px; margin-top:3px; line-height:1;
+  font-size:10px; font-weight:700; letter-spacing:-0.5px;
+}
+.journey-node .n-stars .star { color:rgba(61,46,63,0.2); }
+.journey-node .n-stars .star.filled { color:#E6A400; text-shadow:0 0 3px rgba(230,164,0,0.4); }
+
+.journey-node.locked {
+  background:#E8E4E8;
+  box-shadow:0 3px 0 rgba(61,46,63,0.25);
+  border-color:rgba(61,46,63,0.45);
+  cursor:default;
+}
+.journey-node.locked .n-num { color:rgba(61,46,63,0.4); font-size:20px; }
+
+.journey-node.current {
+  background:var(--sun);
+  animation:pulseNodeAbs 1.3s ease-in-out infinite;
+  z-index:3;
+}
+.journey-node.current .n-num { font-size:24px; }
+@keyframes pulseNodeAbs {
+  0%,100% { transform:translate(-50%,-50%) scale(1);
+    box-shadow:0 5px 0 var(--ink), 0 0 0 0 rgba(255,214,107,0.8); }
+  50% { transform:translate(-50%,-50%) scale(1.08);
+    box-shadow:0 5px 0 var(--ink), 0 0 0 16px rgba(255,214,107,0); }
+}
+
+.journey-node.completed { background:var(--mint); }
+
+.journey-node.boss {
+  width:82px; height:82px;
+  background:var(--rose); border-width:5px;
+}
+.journey-node.boss .n-num { color:white; font-size:24px; text-shadow:2px 2px 0 rgba(0,0,0,0.2); }
+.journey-node.boss.locked { background:#D4AAB7; }
+.journey-node.boss.locked .n-num { color:rgba(255,255,255,0.75); }
+.journey-node.current.boss { animation:pulseBossAbs 1.3s ease-in-out infinite; }
+@keyframes pulseBossAbs {
+  0%,100% { transform:translate(-50%,-50%) scale(1);
+    box-shadow:0 5px 0 var(--ink), 0 0 0 0 rgba(255,143,184,0.85); }
+  50% { transform:translate(-50%,-50%) scale(1.06);
+    box-shadow:0 5px 0 var(--ink), 0 0 0 18px rgba(255,143,184,0); }
+}
+
+.journey-node .n-badge {
+  position:absolute; top:-8px; right:-10px;
+  width:30px; height:30px;
+  background:white; border:2.5px solid var(--ink); border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; box-shadow:0 2px 0 var(--ink);
+  animation:badgeWiggle 3.2s ease-in-out infinite;
+}
+@keyframes badgeWiggle {
+  0%,92%,100% { transform:rotate(0); }
+  94% { transform:rotate(-12deg); }
+  96% { transform:rotate(12deg); }
+  98% { transform:rotate(-6deg); }
+}
+.journey-node.locked .n-badge { filter:grayscale(0.7); opacity:0.65; animation:none; }
+.journey-node .n-lock {
+  position:absolute; top:-6px; right:-6px;
+  width:24px; height:24px;
+  background:white; border:2px solid var(--ink); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+  box-shadow:0 2px 0 var(--ink);
+}
+
+/* Checkpoint banner every 25 levels */
+.journey-checkpoint {
+  position:absolute; left:50%; transform:translate(-50%, -50%);
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:11px;
+  color:#6B4FA0; letter-spacing:2.5px;
+  background:white; border:2.5px solid #6B4FA0; border-radius:999px;
+  padding:4px 14px; white-space:nowrap;
+  box-shadow:0 3px 0 #6B4FA0; z-index:2; pointer-events:none;
+}
+
+/* Level start modal */
+.level-start { position:absolute; inset:0; z-index:90;
+  background:rgba(61,46,63,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+.level-start-card { background:white; border:4px solid var(--ink); border-radius:26px;
+  padding:22px 20px; box-shadow:0 7px 0 var(--ink); max-width:320px; width:100%; text-align:center;
+  animation:popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.level-start-card h2 { font-family:'Fredoka',sans-serif; font-size:26px; font-weight:700; margin-bottom:4px; }
+.level-start-card .type { font-family:'Fredoka',sans-serif; font-size:12px; color:#6B4FA0;
+  letter-spacing:1.5px; text-transform:uppercase; margin-bottom:12px; }
+.level-start-card .info { font-family:'Fredoka',sans-serif; font-size:14px; color:#4A3D4C;
+  line-height:1.6; margin-bottom:16px; }
+.level-start-card .mascot { font-size:56px; margin-bottom:4px; display:block; animation:bounce 1.5s ease-in-out infinite; }
+
+.feedback-toast { position:absolute; top:45%; left:50%;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:28px;
+  z-index:40; pointer-events:none; animation:toast 1s ease forwards;
+  text-shadow:3px 3px 0 rgba(61,46,63,0.25); white-space:nowrap; }
+@keyframes toast {
+  0%{opacity:0; transform:translate(-50%, 0) scale(0.4);}
+  20%{opacity:1; transform:translate(-50%, -20px) scale(1.2);}
+  80%{opacity:1; transform:translate(-50%, -30px) scale(1);}
+  100%{opacity:0; transform:translate(-50%, -70px) scale(1);}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gameCanvas"></canvas>
+
+  <div class="hud" id="hud" style="display:none;">
+    <button class="back-btn" id="backBtn" title="Back to map">✕</button>
+    <div class="hud-pill lives">❤️ <span id="livesTxt">5</span></div>
+    <div class="hud-pill level">📚 <span id="levelTxt">P1</span> · <span id="levelNumTxt">1</span></div>
+    <div class="hud-pill coins">💰 <span id="coinsTxt">60</span></div>
+  </div>
+
+  <div class="phase-banner" id="phaseBanner" style="display:none;">PREP</div>
+  <div class="hint" id="hint" style="display:none;"></div>
+
+  <div class="sound-controls" style="display:none;" id="soundControls">
+    <button class="sound-btn" id="musicBtn" title="Toggle music">🎵</button>
+    <button class="sound-btn" id="sfxBtn" title="Toggle sound effects">🔊</button>
+  </div>
+
+  <button class="send-wave-btn hidden" id="sendWaveBtn">START ROUND 🌊</button>
+
+  <div class="tower-bar" id="towerBar" style="display:none;"></div>
+
+  <!-- Mode selection (first screen) -->
+  <div class="screen" id="modeScreen">
+    <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
+    <div class="title">Kawaii<br>Defenders</div>
+    <div class="subtitle">Learn while you defend! 🎓🏰</div>
+    <div class="label">Choose your mode</div>
+    <div class="mode-grid" id="modeGrid">
+      <div class="mode-card" data-mode="kids">
+        <div class="mode-icon">🧒</div>
+        <div class="mode-name">Kids</div>
+        <div class="mode-desc">Singapore MOE syllabus<br>K2 · P1 · P2 · P3</div>
+      </div>
+      <div class="mode-card" data-mode="adults">
+        <div class="mode-icon">🧑</div>
+        <div class="mode-name">Adults</div>
+        <div class="mode-desc">Language learning<br>Korean · More coming!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start screen (adapts to mode) -->
+  <div class="screen hidden" id="startScreen">
+    <!-- Content generated dynamically by buildStartScreen() -->
+  </div>
+
+  <!-- Journey map -->
+  <div class="screen hidden" id="journeyScreen">
+    <div class="journey-header">
+      <div class="journey-title" id="journeyTitle">P1 · Math</div>
+      <div class="journey-sub" id="journeySub">500 levels · 50 boss battles</div>
+      <div class="journey-legend">
+        <span class="legend-chip"><span class="legend-swatch" style="background:#FFD66B;"></span>Now</span>
+        <span class="legend-chip"><span class="legend-swatch" style="background:#A8E6CF;"></span>Done</span>
+        <span class="legend-chip"><span class="legend-swatch" style="background:#FF8FB8;"></span>Boss</span>
+        <span class="legend-chip"><span class="legend-swatch" style="background:#E8E4E8;"></span>Locked</span>
+      </div>
+    </div>
+    <div class="journey-map" id="journeyMap"></div>
+    <button class="back-btn floating" id="journeyBackBtn" style="top:10px; left:10px;">←</button>
+  </div>
+
+  <!-- Quiz overlay -->
+  <div class="quiz-overlay" id="quizOverlay" style="display:none;"></div>
+
+  <!-- Tower upgrade popup -->
+  <div class="tower-popup" id="towerPopup" style="display:none;"></div>
+
+  <!-- Level start/end modal -->
+  <div class="level-start" id="levelStartModal" style="display:none;"></div>
+</div>
+
+<script>
+// ============== AUDIO ENGINE ==============
+const audio = {
+  ctx:null, master:null, musicBus:null, sfxBus:null,
+  musicOn:true, sfxOn:true, musicActive:false, musicTimer:null,
+  currentStep:0, nextStepTime:0, tempoMul:1.0, lastShootAt:0,
+  init() {
+    if (this.ctx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain(); this.master.gain.value = 0.7;
+      this.master.connect(this.ctx.destination);
+      this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.25;
+      this.musicBus.connect(this.master);
+      this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 0.55;
+      this.sfxBus.connect(this.master);
+    } catch(e) {}
+  },
+  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(()=>{}); },
+  tone(freq, dur, opts={}) {
+    if (!this.ctx || !this.sfxOn) return;
+    const t = this.ctx.currentTime + (opts.delay || 0);
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+    osc.type = opts.type || 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    if (opts.sweepTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.sweepTo), t + dur);
+    const vol = opts.volume != null ? opts.volume : 0.3;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain).connect(this.sfxBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  },
+  noise(dur, opts={}) {
+    if (!this.ctx || !this.sfxOn) return;
+    const t = this.ctx.currentTime + (opts.delay || 0);
+    const bs = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<bs;i++) d[i] = Math.random()*2 - 1;
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter();
+    f.type = opts.filterType || 'lowpass';
+    f.frequency.setValueAtTime(opts.cutoffStart || opts.cutoff || 800, t);
+    if (opts.cutoffEnd) f.frequency.exponentialRampToValueAtTime(opts.cutoffEnd, t + dur);
+    const g = this.ctx.createGain();
+    const vol = opts.volume != null ? opts.volume : 0.2;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(this.sfxBus);
+    src.start(t); src.stop(t + dur + 0.05);
+  },
+  arp(freqs, noteDur, type='sine', vol=0.26) {
+    freqs.forEach((f, i) => { if (f) this.tone(f, noteDur * 1.2, { type, volume: vol, delay: i * noteDur }); });
+  },
+  play(name) {
+    if (!this.ctx || !this.sfxOn) return;
+    this.resume();
+    const now = performance.now();
+    switch (name) {
+      case 'select': this.tone(880, 0.05, {type:'triangle', volume:0.22}); break;
+      case 'place': this.tone(700, 0.12, {sweepTo:320, type:'sine', volume:0.3});
+        this.tone(1100, 0.08, {sweepTo:550, type:'sine', volume:0.15, delay:0.02}); break;
+      case 'upgrade': this.arp([523.25, 659.25, 783.99, 1046.50, 1318.51], 0.06, 'sine', 0.3); break;
+      case 'sell': this.tone(500, 0.15, {sweepTo:200, type:'triangle', volume:0.22}); break;
+      case 'invalid': this.tone(180, 0.12, {type:'square', volume:0.12});
+        this.tone(150, 0.1, {type:'square', volume:0.1, delay:0.05}); break;
+      case 'shoot':
+        if (now - this.lastShootAt < 70) return;
+        this.lastShootAt = now;
+        this.tone(1400, 0.05, {sweepTo:700, type:'sawtooth', volume:0.08}); break;
+      case 'hit': this.noise(0.06, {cutoff:500, volume:0.12}); break;
+      case 'defeat': this.arp([523.25, 659.25, 783.99], 0.045, 'sine', 0.22); break;
+      case 'heartlost': this.tone(440, 0.35, {sweepTo:140, type:'triangle', volume:0.3}); break;
+      case 'wave': this.noise(0.5, {filterType:'bandpass', cutoffStart:300, cutoffEnd:2400, volume:0.28});
+        this.tone(220, 0.4, {sweepTo:660, type:'sawtooth', volume:0.12, delay:0.1}); break;
+      case 'quiz': this.arp([523.25, 659.25, 783.99, 1046.50], 0.11, 'sine', 0.28); break;
+      case 'correct': this.arp([523.25, 659.25, 783.99, 1046.50], 0.07, 'sine', 0.3);
+        this.tone(1318.51, 0.22, {type:'sine', volume:0.2, delay:0.28}); break;
+      case 'wrong': this.arp([392.0, 349.23, 293.66], 0.14, 'triangle', 0.22); break;
+      case 'perfect': {
+        const p = [[523.25,0],[659.25,0.1],[783.99,0.2],[1046.50,0.3],[1318.51,0.45],[1046.50,0.6],[1318.51,0.7],[1568,0.85]];
+        p.forEach(([f,d]) => this.tone(f, 0.3, {type:'sine', volume:0.28, delay:d})); break;
+      }
+      case 'victory': {
+        const v = [[523.25,0],[659.25,0.12],[783.99,0.24],[1046.50,0.36],[880,0.55],[1046.50,0.7],[1318.51,0.85],[1567.98,1.0]];
+        v.forEach(([f,d]) => this.tone(f, 0.35, {type:'sine', volume:0.3, delay:d})); break;
+      }
+      case 'defeat_game': this.arp([349.23, 311.13, 261.63, 220], 0.22, 'triangle', 0.26); break;
+      case 'click': this.tone(700, 0.04, {type:'sine', volume:0.18}); break;
+      case 'boss': {
+        const b = [[130.81,0],[130.81,0.15],[174.61,0.3],[130.81,0.45],[196,0.6],[130.81,0.75]];
+        b.forEach(([f,d]) => this.tone(f, 0.2, {type:'sawtooth', volume:0.2, delay:d})); break;
+      }
+    }
+  },
+  startMusic() {
+    if (!this.ctx || !this.musicOn || this.musicActive) return;
+    this.musicActive = true; this.currentStep = 0;
+    this.nextStepTime = this.ctx.currentTime + 0.1;
+    this._loop();
+  },
+  stopMusic() {
+    this.musicActive = false;
+    if (this.musicTimer) { clearTimeout(this.musicTimer); this.musicTimer = null; }
+  },
+  setTempo(mul) { this.tempoMul = mul; },
+  _loop() {
+    if (!this.musicActive || !this.ctx) return;
+    const bpm = 92 * this.tempoMul;
+    const stepDur = (60 / bpm) / 2;
+    const MEL = [523,0,659,0,784,0,659,0, 880,0,784,0,659,0,523,0, 587,0,659,0,784,0,880,0, 784,0,587,0,523,0,0,0];
+    const BASS = [130,0,0,0,196,0,0,0, 220,0,0,0,164,0,0,0, 174,0,0,0,196,0,0,0, 196,0,0,0,130,0,0,0];
+    while (this.nextStepTime < this.ctx.currentTime + 0.25) {
+      const step = this.currentStep % MEL.length;
+      if (MEL[step]) this._note(MEL[step], this.nextStepTime, stepDur*0.7, 'sine', 0.13);
+      if (BASS[step]) this._note(BASS[step], this.nextStepTime, stepDur*1.6, 'triangle', 0.09);
+      if (step % 4 === 2) this._hat(this.nextStepTime);
+      this.nextStepTime += stepDur;
+      this.currentStep++;
+    }
+    this.musicTimer = setTimeout(() => this._loop(), 30);
+  },
+  _note(freq, t, dur, type, vol) {
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(this.musicBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  },
+  _hat(t) {
+    const bs = Math.floor(this.ctx.sampleRate * 0.04);
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<bs;i++) d[i] = Math.random()*2 - 1;
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 5000;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.05, t + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    src.connect(f).connect(g).connect(this.musicBus); src.start(t);
+  },
+  toggleMusic() { this.musicOn = !this.musicOn; if (this.musicOn) this.startMusic(); else this.stopMusic(); return this.musicOn; },
+  toggleSfx() { this.sfxOn = !this.sfxOn; return this.sfxOn; },
+};
+
+// ============== QUESTIONS ==============
+const Q = {
+  K2: {
+    math: [
+      {q:"Count: 🍎🍎🍎", opts:["2","3","4","5"], a:1, topic:"NEL · Counting to 10", exp:"Count each apple: 1… 2… 3! There are 3 apples. 🍎🍎🍎 = 3"},
+      {q:"Count: ⭐⭐⭐⭐⭐", opts:["3","4","5","6"], a:2, topic:"NEL · Counting to 10", exp:"Point to each star as you count: 1, 2, 3, 4, 5! Five stars! ⭐"},
+      {q:"1 + 1 = ?", opts:["1","2","3","4"], a:1, topic:"NEL · Addition within 5", exp:"Think of it as: 1 finger + 1 finger = 2 fingers! ☝️☝️"},
+      {q:"2 + 1 = ?", opts:["2","3","4","5"], a:1, topic:"NEL · Addition within 5", exp:"Start at 2, then count 1 more: 2… 3! So 2 + 1 = 3"},
+      {q:"3 + 2 = ?", opts:["4","5","6","7"], a:1, topic:"NEL · Addition within 10", exp:"Hold up 3 fingers, then 2 more: 3… 4, 5! So 3 + 2 = 5"},
+      {q:"What comes after 7?", opts:["6","7","8","9"], a:2, topic:"NEL · Number sequence", exp:"Count forward: 5, 6, 7, 8! The number after 7 is 8."},
+      {q:"What comes before 5?", opts:["3","4","5","6"], a:1, topic:"NEL · Number sequence", exp:"Count backward: 5, 4! The number before 5 is 4."},
+      {q:"Which is more: 3 or 6?", opts:["3","6","same","?"], a:1, topic:"NEL · Comparing", exp:"6 is more than 3. Think: 🍎🍎🍎 vs 🍎🍎🍎🍎🍎🍎 — six has more!"},
+      {q:"🔵 is a ___", opts:["square","circle","triangle","star"], a:1, topic:"NEL · Shapes", exp:"A circle is round with no corners — like a ball or the sun! ⭕"},
+      {q:"How many sides on a △?", opts:["2","3","4","5"], a:1, topic:"NEL · Shapes", exp:"A triangle has 3 sides: △ — count them: 1, 2, 3!"},
+    ],
+    english: [
+      {q:"Which letter is this: A", opts:["A","B","C","D"], a:0, topic:"NEL · Letter recognition", exp:"This is the letter A — it's the very first letter of the alphabet! 🅰️"},
+      {q:"Which letter comes after B?", opts:["A","C","D","E"], a:1, topic:"NEL · Alphabet order", exp:"The alphabet goes: A, B, C! So C comes right after B."},
+      {q:"🐕 is a ___", opts:["cat","dog","bird","fish"], a:1, topic:"NEL · Picture words", exp:"🐕 is a dog! Dogs say 'woof' and love to play fetch. 🐶"},
+      {q:"🐈 is a ___", opts:["cat","dog","bird","fish"], a:0, topic:"NEL · Picture words", exp:"🐈 is a cat! Cats say 'meow' and love to nap. 😺"},
+      {q:"The ___ is red.", opts:["apple","sky","grass","water"], a:0, topic:"NEL · Colours & words", exp:"Apples are red! 🍎 The sky is blue, grass is green, and water is clear."},
+      {q:"The sky is ___.", opts:["red","green","blue","pink"], a:2, topic:"NEL · Colours & words", exp:"Look up! The sky is blue. ☁️🔵 Blue like the ocean too!"},
+      {q:"Starts with 'B':", opts:["apple","ball","cat","dog"], a:1, topic:"NEL · Beginning sounds", exp:"Ball starts with 'B' — say it slowly: B-all. Listen for the 'buh' sound! 🏀"},
+      {q:"Starts with 'S':", opts:["tree","run","sun","ball"], a:2, topic:"NEL · Beginning sounds", exp:"Sun starts with 'S' — say it slowly: S-un. Listen for the 'sss' sound! ☀️"},
+      {q:"Which is bigger?", opts:["🐜 ant","🐘 elephant","🐛 worm","🐝 bee"], a:1, topic:"NEL · Concepts", exp:"An elephant is the biggest! 🐘 It's much bigger than tiny ants and bees."},
+      {q:"We sleep at ___.", opts:["morning","afternoon","night","noon"], a:2, topic:"NEL · Daily routine", exp:"We sleep at night! 🌙 When it's dark and the moon is out, it's bedtime."},
+    ],
+    chinese: [
+      {q:"一 means?", opts:["1","2","3","4"], a:0, topic:"NEL 华文 · 数字", exp:"一 (yī) means 1. It looks like one line — one finger! ☝️"},
+      {q:"二 means?", opts:["1","2","3","4"], a:1, topic:"NEL 华文 · 数字", exp:"二 (èr) means 2. It has two lines — like two fingers! ✌️"},
+      {q:"大 means?", opts:["big","small","tall","short"], a:0, topic:"NEL 华文 · 大小", exp:"大 (dà) means big! It looks like a person stretching their arms wide. 🤗"},
+      {q:"小 means?", opts:["big","small","long","short"], a:1, topic:"NEL 华文 · 大小", exp:"小 (xiǎo) means small. Think of something tiny, like an ant! 🐜"},
+      {q:"🍎 is 苹___", opts:["果","花","鱼","水"], a:0, topic:"NEL 华文 · 水果", exp:"Apple is 苹果 (píng guǒ). 果 means fruit — so it's 'apple fruit'! 🍎"},
+      {q:"爸爸 means?", opts:["mother","father","brother","sister"], a:1, topic:"NEL 华文 · 家人", exp:"爸爸 (bà ba) means father/daddy! Say 'ba ba' — it sounds warm! 👨"},
+      {q:"妈妈 means?", opts:["father","mother","brother","sister"], a:1, topic:"NEL 华文 · 家人", exp:"妈妈 (mā ma) means mother/mummy! Say 'ma ma' — just like in English! 👩"},
+      {q:"红 means?", opts:["blue","green","red","yellow"], a:2, topic:"NEL 华文 · 颜色", exp:"红 (hóng) means red — like a red apple 🍎 or Chinese New Year decorations! 🧧"},
+      {q:"🐟 is ___", opts:["猫","狗","鱼","鸟"], a:2, topic:"NEL 华文 · 动物", exp:"🐟 is 鱼 (yú) — fish! The character 鱼 even looks a bit like a fish swimming! 🐠"},
+      {q:"你好 means?", opts:["goodbye","hello","thank you","sorry"], a:1, topic:"NEL 华文 · 问候", exp:"你好 (nǐ hǎo) means hello! It literally means 'you good' — a friendly greeting! 👋"},
+    ],
+  },
+  P1: {
+    math: [
+      {q:"2 + 3 = ?", opts:["4","5","6","7"], a:1, topic:"MPAH 1A · Addition within 10", exp:"Start at 2, count 3 more: 2… 3, 4, 5! So 2 + 3 = 5"},
+      {q:"4 + 5 = ?", opts:["7","8","9","10"], a:2, topic:"MPAH 1A · Addition within 10", exp:"Think of 5 + 4: five fingers on one hand, four on the other = 9! ✋🤚"},
+      {q:"6 + 7 = ?", opts:["11","12","13","14"], a:2, topic:"MPAH 1B · Addition within 40", exp:"Break it up: 6 + 7 = 6 + 4 + 3 = 10 + 3 = 13. Making 10 helps!"},
+      {q:"8 + 4 = ?", opts:["10","11","12","13"], a:2, topic:"MPAH 1B · Addition within 40", exp:"8 needs 2 more to make 10. Take 2 from the 4: 10 + 2 = 12!"},
+      {q:"10 − 3 = ?", opts:["5","6","7","8"], a:2, topic:"MPAH 1A · Subtraction within 10", exp:"Start at 10, count back 3: 10… 9, 8, 7! So 10 − 3 = 7"},
+      {q:"15 − 6 = ?", opts:["7","8","9","10"], a:2, topic:"MPAH 1B · Subtraction within 40", exp:"15 − 6: take away 5 first → 10, then 1 more → 9. So 15 − 6 = 9"},
+      {q:"18 − 9 = ?", opts:["7","8","9","10"], a:2, topic:"MPAH 1B · Subtraction within 40", exp:"18 − 9: think of doubles! 9 + 9 = 18, so 18 − 9 = 9"},
+      {q:"Count: 🍎🍎🍎🍎", opts:["2","3","4","5"], a:2, topic:"MPAH 1A · Counting", exp:"Point and count each apple: 1, 2, 3, 4! There are 4 apples. 🍎🍎🍎🍎"},
+      {q:"Bigger: 7 or 12?", opts:["7","12","same","?"], a:1, topic:"MPAH 1A · Comparing", exp:"12 is bigger than 7. On a number line, 12 is further to the right! →"},
+      {q:"Next: 1,2,3,?,5", opts:["3","4","5","6"], a:1, topic:"MPAH 1A · Patterns", exp:"Count up by 1: 1, 2, 3, 4, 5. The missing number is 4!"},
+    ],
+    english: [
+      {q:"A furry pet that says 'meow':", opts:["cat","kat","cet","caat"], a:0, topic:"STELLAR P1 · CVC spelling", exp:"C-A-T spells 'cat'. It's a CVC word: Consonant-Vowel-Consonant! 🐱"},
+      {q:"Yellow and hot in the daytime sky:", opts:["son","sun","sunn","sen"], a:1, topic:"STELLAR P1 · CVC spelling", exp:"S-U-N spells 'sun'. Don't mix up 'sun' (the star ☀️) with 'son' (a boy child)!"},
+      {q:"___ dog", opts:["a","an","is","of"], a:0, topic:"STELLAR P1 · Articles", exp:"Use 'a' before words starting with a consonant sound: a dog, a cat, a ball."},
+      {q:"___ apple", opts:["a","an","is","of"], a:1, topic:"STELLAR P1 · Articles", exp:"Use 'an' before words starting with a vowel sound (a, e, i, o, u): an apple! 🍎"},
+      {q:"She ___ tall.", opts:["am","is","are","be"], a:1, topic:"STELLAR P1 · Subject–verb", exp:"'She' uses 'is': She is tall. I am, you are, he/she is!"},
+      {q:"Plural of CAT:", opts:["cats","cates","cati","caten"], a:0, topic:"STELLAR P1 · Plurals", exp:"To make most words plural, just add 's': 1 cat → 2 cats! 🐱🐱"},
+      {q:"Opposite of UP:", opts:["down","under","over","out"], a:0, topic:"STELLAR P1 · Opposites", exp:"Up ↑ and down ↓ are opposites! A bird flies up, rain falls down."},
+      {q:"Opposite of IN:", opts:["up","out","off","on"], a:1, topic:"STELLAR P1 · Opposites", exp:"In and out are opposites! The cat goes in the box, then comes out. 📦"},
+      {q:"Rhymes with BED:", opts:["red","bad","bid","book"], a:0, topic:"STELLAR P1 · Phonics", exp:"Words rhyme when they end with the same sound: BED and RED both end in '-ed'! 🔴"},
+      {q:"1st letter APPLE?", opts:["a","e","i","p"], a:0, topic:"STELLAR P1 · Letters", exp:"A-P-P-L-E: the first letter is A! It starts with the 'ah' sound. 🍎"},
+    ],
+    chinese: [
+      {q:"一 means?", opts:["1","2","3","4"], a:0, topic:"HLHB 1A · 数字", exp:"一 (yī) means 1. Just one horizontal line = one! ☝️"},
+      {q:"三 means?", opts:["2","3","4","5"], a:1, topic:"HLHB 1A · 数字", exp:"三 (sān) means 3. Three horizontal lines — count them! 三"},
+      {q:"五 means?", opts:["3","4","5","6"], a:2, topic:"HLHB 1A · 数字", exp:"五 (wǔ) means 5. Think: one hand has five fingers! 🖐️"},
+      {q:"大 means?", opts:["big","small","up","down"], a:0, topic:"HLHB 1A · 反义词", exp:"大 (dà) means big! It looks like a person stretching arms wide. 🤗"},
+      {q:"小 means?", opts:["big","small","long","short"], a:1, topic:"HLHB 1A · 反义词", exp:"小 (xiǎo) means small. It's the opposite of 大 (big)!"},
+      {q:"上 means?", opts:["up","down","left","right"], a:0, topic:"HLHB 1A · 方位", exp:"上 (shàng) means up or above. Think: going UP the stairs! ⬆️"},
+      {q:"下 means?", opts:["up","down","left","right"], a:1, topic:"HLHB 1A · 方位", exp:"下 (xià) means down or below. It's the opposite of 上 (up)! ⬇️"},
+      {q:"猫 means?", opts:["cat","dog","fish","bird"], a:0, topic:"HLHB 1B · 动物", exp:"猫 (māo) means cat! Say 'māo' — it sounds like a cat's meow! 🐱"},
+      {q:"狗 means?", opts:["cat","dog","pig","fish"], a:1, topic:"HLHB 1B · 动物", exp:"狗 (gǒu) means dog! The left part 犭 is the animal radical. 🐕"},
+      {q:"妈妈 means?", opts:["father","mother","brother","sister"], a:1, topic:"HLHB 1A · 家人", exp:"妈妈 (mā ma) means mother. The 女 radical means 'female'. 👩"},
+    ],
+  },
+  P2: {
+    math: [
+      {q:"23 + 14 = ?", opts:["35","36","37","38"], a:2, topic:"MPAH 2A · Add within 1000", exp:"Add ones first: 3 + 4 = 7. Then tens: 20 + 10 = 30. Total: 30 + 7 = 37!"},
+      {q:"45 + 28 = ?", opts:["72","73","74","83"], a:1, topic:"MPAH 2A · Regrouping", exp:"5 + 8 = 13. Write 3, carry 1. 4 + 2 + 1 = 7. Answer: 73!"},
+      {q:"60 − 25 = ?", opts:["25","30","35","40"], a:2, topic:"MPAH 2A · Regrouping", exp:"60 − 25: borrow from 6. 10 − 5 = 5, 50 − 20 = 30. Total: 35!"},
+      {q:"2 × 6 = ?", opts:["8","10","12","14"], a:2, topic:"MPAH 2A · ×2 table", exp:"2 × 6 means 6 + 6 = 12. The ×2 table is just doubling! 🔢"},
+      {q:"3 × 4 = ?", opts:["10","12","14","16"], a:1, topic:"MPAH 2A · ×3/×4", exp:"3 × 4 = 4 + 4 + 4 = 12. Or think: 3 groups of 4 objects! 🎲🎲🎲"},
+      {q:"5 × 7 = ?", opts:["30","35","40","45"], a:1, topic:"MPAH 2A · ×5 table", exp:"The ×5 table always ends in 0 or 5: 5, 10, 15, 20, 25, 30, 35! ✋"},
+      {q:"10 × 9 = ?", opts:["19","90","99","109"], a:1, topic:"MPAH 2A · ×10 table", exp:"Multiplying by 10? Just add a 0! 9 × 10 = 90. Easy trick! 🔟"},
+      {q:"$1 = ? cents", opts:["10","50","100","1000"], a:2, topic:"MPAH 2B · Money", exp:"$1 = 100 cents. Think of it as: 100 one-cent coins make one dollar! 💰"},
+      {q:"100 cm = ? m", opts:["1","10","100","1000"], a:0, topic:"MPAH 2A · Length", exp:"100 centimetres = 1 metre. 'Centi' means hundredth, so 100 of them = 1! 📏"},
+      {q:"Half of 20 = ?", opts:["5","10","15","20"], a:1, topic:"MPAH 2B · Fractions", exp:"Half means dividing into 2 equal groups: 20 ÷ 2 = 10. Half of 20 is 10! ½"},
+    ],
+    english: [
+      {q:"A person you like and trust:", opts:["freind","friend","frend","friyend"], a:1, topic:"STELLAR P2 · Spelling (ie)", exp:"F-R-I-E-N-D. Remember: 'I' before 'E' in friend — because I am your friEnd! 🤝"},
+      {q:"Where children go to learn:", opts:["school","scholl","skool","schul"], a:0, topic:"STELLAR P2 · Spelling (oo)", exp:"S-C-H-O-O-L. The 'oo' makes an 'oo' sound, like in 'cool'! 🏫"},
+      {q:"Past of WALK:", opts:["walks","walked","walking","walken"], a:1, topic:"STELLAR P2 · Past tense", exp:"For most verbs, add '-ed' for past tense: walk → walked, jump → jumped! 🚶"},
+      {q:"Past of RUN:", opts:["runned","runs","ran","running"], a:2, topic:"STELLAR P2 · Irregular past", exp:"RUN is irregular — it doesn't use '-ed'. Run → ran. You just have to memorise it! 🏃"},
+      {q:"Plural of CHILD:", opts:["childs","children","childes","childies"], a:1, topic:"STELLAR P2 · Plurals", exp:"CHILD → CHILDREN is an irregular plural. Like man → men, it changes its form! 👧👦"},
+      {q:"Plural of FOOT:", opts:["foots","feet","feets","feeted"], a:1, topic:"STELLAR P2 · Plurals", exp:"FOOT → FEET is irregular. Like tooth → teeth — the 'oo' becomes 'ee'! 🦶🦶"},
+      {q:"The girl likes ___ cat.", opts:["his","her","their","its"], a:1, topic:"STELLAR P2 · Possessives", exp:"'Girl' is female, so use 'her': The girl likes her cat. His = male, her = female! 👧🐱"},
+      {q:"Opposite of BEGIN:", opts:["end","start","open","finish"], a:0, topic:"STELLAR P2 · Antonyms", exp:"Begin and end are antonyms (opposites). A story begins and then it ends! 📖"},
+      {q:"Synonym of BIG:", opts:["small","large","tiny","little"], a:1, topic:"STELLAR P2 · Synonyms", exp:"Synonyms are words with similar meanings. Big = large. They mean the same thing! 🐘"},
+      {q:"He runs ___.", opts:["quickly","quick","quicker","quickness"], a:0, topic:"STELLAR P2 · Adverbs", exp:"Adverbs describe HOW you do something. He runs quickly. Add '-ly' to make adverbs! 🏃💨"},
+    ],
+    chinese: [
+      {q:"学校 means?", opts:["school","home","park","shop"], a:0, topic:"HLHB 2A · 学校", exp:"学校 (xué xiào): 学 = learn, 校 = school. The place where you learn! 🏫"},
+      {q:"老师 means?", opts:["teacher","student","doctor","friend"], a:0, topic:"HLHB 2A · 学校", exp:"老师 (lǎo shī) means teacher. 师 means master or expert! 👩‍🏫"},
+      {q:"同学 means?", opts:["teacher","classmate","parent","child"], a:1, topic:"HLHB 2A · 学校", exp:"同学 (tóng xué): 同 = same, 学 = study. People who study together = classmates! 👫"},
+      {q:"高兴 means?", opts:["happy","sad","angry","tired"], a:0, topic:"HLHB 2A · 情感", exp:"高兴 (gāo xìng) means happy! 高 = high, 兴 = mood. Your mood is high = happy! 😊"},
+      {q:"喜欢 means?", opts:["like","dislike","hate","eat"], a:0, topic:"HLHB 2A · 情感", exp:"喜欢 (xǐ huān) means to like. 我喜欢吃冰淇淋 = I like eating ice cream! 🍦"},
+      {q:"水 pinyin?", opts:["shuǐ","shū","shuì","sī"], a:0, topic:"HLHB · 拼音", exp:"水 is pronounced 'shuǐ' (third tone). It means water! 💧"},
+      {q:"火 pinyin?", opts:["hé","huǒ","hǔ","hē"], a:1, topic:"HLHB · 拼音", exp:"火 is pronounced 'huǒ' (third tone). It means fire! The character looks like flames. 🔥"},
+      {q:"天 means?", opts:["sun","sky","cloud","tree"], a:1, topic:"HLHB 1A · 自然", exp:"天 (tiān) means sky or day. 今天 = today (this + sky/day)! ☁️"},
+      {q:"Opposite of 开:", opts:["关","门","窗","走"], a:0, topic:"HLHB 2A · 反义词", exp:"开 (kāi) = open, 关 (guān) = close. They're opposites! 开门 = open door, 关门 = close door. 🚪"},
+      {q:"我的 means?", opts:["my","your","his","her"], a:0, topic:"HLHB 1B · 所有格", exp:"我 = I/me, 的 = possessive marker. 我的 = my. Like 我的书 = my book! 📖"},
+    ],
+  },
+  P3: {
+    math: [
+      {q:"7 × 8 = ?", opts:["54","56","58","60"], a:1, topic:"MPAH 3A · ×7/×8", exp:"7 × 8 = 56. Memory trick: 5, 6, 7, 8 → 56 = 7 × 8! The numbers count up."},
+      {q:"9 × 6 = ?", opts:["45","48","54","56"], a:2, topic:"MPAH 3A · ×6/×9", exp:"9 × 6: use the 9-trick! 9 × 6 = 54. Fingers method: hold down finger 6, count 5 and 4!"},
+      {q:"24 ÷ 4 = ?", opts:["4","5","6","8"], a:2, topic:"MPAH 3A · Division", exp:"24 ÷ 4 = 6. Think: 4 × ? = 24. Since 4 × 6 = 24, the answer is 6!"},
+      {q:"36 ÷ 6 = ?", opts:["5","6","7","8"], a:1, topic:"MPAH 3A · Division", exp:"36 ÷ 6 = 6. Division is the opposite of multiplication: 6 × 6 = 36!"},
+      {q:"½ + ½ = ?", opts:["0","¼","½","1"], a:3, topic:"MPAH 3B · Fractions", exp:"Half + half = one whole! Like two halves of a pizza make a full pizza. 🍕"},
+      {q:"Half of 24 = ?", opts:["10","12","14","16"], a:1, topic:"MPAH 3B · Fractions", exp:"Half of 24 = 24 ÷ 2 = 12. Split 24 into two equal groups of 12!"},
+      {q:"¼ of 20 = ?", opts:["4","5","6","10"], a:1, topic:"MPAH 3B · Fractions", exp:"¼ of 20 = 20 ÷ 4 = 5. Quarter means 4 equal parts. Each part is 5!"},
+      {q:"Perimeter sq (side 5)", opts:["10","15","20","25"], a:2, topic:"MPAH 3B · Perimeter", exp:"A square has 4 equal sides. Perimeter = 4 × side = 4 × 5 = 20! □"},
+      {q:"345 + 128 = ?", opts:["463","473","483","573"], a:1, topic:"MPAH 3A · Add within 10k", exp:"Add column by column: 5+8=13 (carry 1), 4+2+1=7, 3+1=4. Answer: 473!"},
+      {q:"3:30 PM in 24-hr?", opts:["03:30","13:30","15:30","23:30"], a:2, topic:"MPAH 3B · 24-hr clock", exp:"For PM times, add 12: 3 PM = 3+12 = 15. So 3:30 PM = 15:30! 🕞"},
+    ],
+    english: [
+      {q:"___ going home.", opts:["There","Their","They're","Thier"], a:2, topic:"STELLAR P3 · Homophones", exp:"They're = they are. Their = belonging to them. There = a place. They're going = they are going! 🏠"},
+      {q:"The dogs ___ loud.", opts:["was","were","is","am"], a:1, topic:"STELLAR P3 · Agreement", exp:"'Dogs' is plural, so use 'were': The dogs were loud. Was = singular, were = plural! 🐕🐕"},
+      {q:"Past of SWIM:", opts:["swimmed","swam","swimming","swum"], a:1, topic:"STELLAR P3 · Irregular past", exp:"SWIM → SWAM (past tense). It's irregular: swim, swam, swum. No '-ed' allowed! 🏊"},
+      {q:"Short for DO NOT:", opts:["dont","doesn't","don't","donot"], a:2, topic:"STELLAR P3 · Contractions", exp:"DO NOT → DON'T. The apostrophe ' replaces the missing letter 'o'. Don't forget the apostrophe! ✏️"},
+      {q:"Synonym of HAPPY:", opts:["sad","angry","joyful","tired"], a:2, topic:"STELLAR P3 · Synonyms", exp:"Happy and joyful mean the same thing! Synonyms are words with similar meanings. 😊"},
+      {q:"Antonym of BRAVE:", opts:["bold","scared","strong","tall"], a:1, topic:"STELLAR P3 · Antonyms", exp:"Brave (not afraid) ↔ Scared (afraid). They're antonyms — words with opposite meanings! 🦁😰"},
+      {q:"Prefix in UNHAPPY:", opts:["un","hap","py","happy"], a:0, topic:"STELLAR P3 · Prefixes", exp:"UN- is a prefix meaning 'not'. Un + happy = unhappy (not happy). Un + kind = unkind!"},
+      {q:"Plural of LEAF:", opts:["leafs","leaves","leafes","leafies"], a:1, topic:"STELLAR P3 · Plurals", exp:"Words ending in -f change to -ves: leaf → leaves, wolf → wolves, knife → knives! 🍃"},
+      {q:"Which is a full sentence?", opts:["In the park","The cat sat down","Big dog","Under the"], a:1, topic:"STELLAR P3 · Sentences", exp:"A full sentence needs a subject + verb. 'The cat sat down' has both! The others are just fragments. 🐱"},
+      {q:"Homophone of NIGHT:", opts:["knight","nite","know","new"], a:0, topic:"STELLAR P3 · Homophones", exp:"Night and knight sound the same but mean different things! Night = dark time. Knight = armour warrior! 🌙⚔️"},
+    ],
+    chinese: [
+      {q:"春天 means?", opts:["spring","summer","autumn","winter"], a:0, topic:"HLHB 3A · 季节", exp:"春天 (chūn tiān): 春 = spring, 天 = day/season. The season of flowers! 🌸"},
+      {q:"夏天 means?", opts:["spring","summer","autumn","winter"], a:1, topic:"HLHB 3A · 季节", exp:"夏天 (xià tiān) = summer. The hot season! ☀️ 秋天 = autumn, 冬天 = winter."},
+      {q:"下雨 means?", opts:["raining","snowing","sunny","windy"], a:0, topic:"HLHB 3A · 天气", exp:"下雨 (xià yǔ): 下 = falling, 雨 = rain. Rain is falling! 🌧️"},
+      {q:"马马虎虎 means?", opts:["very good","so-so","very bad","fast"], a:1, topic:"HLHB 3A · 成语", exp:"马马虎虎 (mǎ ma hū hū) means so-so/careless. It literally means 'horse horse tiger tiger'! 🐴🐯"},
+      {q:"聪明 means?", opts:["clever","lazy","kind","shy"], a:0, topic:"HLHB 3A · 形容词", exp:"聪明 (cōng míng) = clever/smart. 耳 (ear) is in 聪 — clever people listen well! 👂🧠"},
+      {q:"帮助 means?", opts:["play","help","run","eat"], a:1, topic:"HLHB 3A · 动词", exp:"帮助 (bāng zhù) = to help. 我帮助朋友 = I help my friend! 🤝"},
+      {q:"迟到 means?", opts:["early","late","on time","absent"], a:1, topic:"HLHB 3A · 学校", exp:"迟到 (chí dào) = late (for school/work). 迟 = slow/late, 到 = arrive. Arriving slowly! ⏰"},
+      {q:"我___去学校", opts:["要","是","的","了"], a:0, topic:"HLHB 3A · 句型", exp:"我要去学校 = I want to go to school. 要 (yào) means 'want to' before a verb! 🏫"},
+      {q:"Classifier for 人:", opts:["个","只","本","条"], a:0, topic:"HLHB 2B · 量词", exp:"个 (gè) is used for people: 一个人 = one person. 个 is the most common classifier! 👤"},
+      {q:"Classifier for 书:", opts:["个","只","本","条"], a:2, topic:"HLHB 2B · 量词", exp:"本 (běn) is for books: 一本书 = one book. Each type of object has its own classifier! 📚"},
+    ],
+  },
+  // ===== ADULT TIERS =====
+  beginner: {
+    korean: [
+      {q:"ㄱ sounds like?", opts:["g/k","n","d/t","r/l"], a:0, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㄱ (기역) makes 'g' at the start, 'k' at the end of a syllable. 🔤"},
+      {q:"ㄴ sounds like?", opts:["g","n","d","m"], a:1, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㄴ (니은) makes an 'n' sound, like in 나 (na = I/me). 🔤"},
+      {q:"ㅁ sounds like?", opts:["b","n","m","r"], a:2, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㅁ (미음) makes an 'm' sound. It looks like a box/mouth! 👄"},
+      {q:"ㅅ sounds like?", opts:["s","j","ch","h"], a:0, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㅅ (시옷) makes an 's' sound. It looks like a hat! 🎩"},
+      {q:"ㅈ sounds like?", opts:["s","j/ch","h","g"], a:1, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㅈ (지읒) makes a 'j' sound. Before ㅣ it sounds like 'ji'. 🔤"},
+      {q:"ㅎ sounds like?", opts:["g","n","s","h"], a:3, ml:1, topic:"TOPIK I · Hangul 자음", exp:"ㅎ (히읗) makes an 'h' sound. 하 = ha, 호 = ho. 🔤"},
+      {q:"ㄲ is called?", opts:["single ㄱ","double ㄱ","ㄱ+ㅎ","silent ㄱ"], a:1, ml:1, topic:"TOPIK I · 쌍자음", exp:"ㄲ is a tense/double consonant. Stronger than ㄱ: 가 (ga) vs 까 (kka)! 💪"},
+      {q:"ㅃ sounds like?", opts:["ba","pa","ppa","bba"], a:2, ml:1, topic:"TOPIK I · 쌍자음", exp:"ㅃ is tense ㅂ. No aspiration, tensed throat: 빠르다 (ppareuda) = fast! ⚡"},
+      {q:"ㅏ sounds like?", opts:["ah","oh","oo","ee"], a:0, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅏ = 'ah' as in 'father'. Stroke goes right from the vertical line! →"},
+      {q:"ㅓ sounds like?", opts:["ah","uh/eo","oo","ee"], a:1, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅓ = 'uh/eo'. Stroke goes left ←. ㅏ vs ㅓ = right vs left!"},
+      {q:"ㅗ sounds like?", opts:["ah","uh","oh","oo"], a:2, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅗ = 'oh' as in 'go'. Stroke goes up ↑ from horizontal line!"},
+      {q:"ㅜ sounds like?", opts:["oh","oo","ee","eh"], a:1, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅜ = 'oo' as in 'pool'. Stroke goes down ↓. ㅗ vs ㅜ = up vs down!"},
+      {q:"ㅣ sounds like?", opts:["ah","oh","oo","ee"], a:3, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅣ = 'ee' as in 'see'. Just a single vertical line! |"},
+      {q:"ㅡ sounds like?", opts:["ah","eu","oo","ee"], a:1, ml:1, topic:"TOPIK I · Hangul 모음", exp:"ㅡ = 'eu' — no English equivalent! Spread lips like 'ee' but don't smile. 😐"},
+      {q:"ㅐ sounds like?", opts:["ah","ae/eh","oh","oo"], a:1, ml:1, topic:"TOPIK I · 복합모음", exp:"ㅐ = 'ae/eh' like in 'bed'. It's ㅏ + ㅣ combined!"},
+      {q:"ㅔ sounds like?", opts:["ah","ae/eh","oh","oo"], a:1, ml:1, topic:"TOPIK I · 복합모음", exp:"ㅔ = 'eh' like in 'bed'. Very similar to ㅐ — most Koreans pronounce them the same!"},
+      {q:"가 = ?", opts:["ga","na","da","ma"], a:0, ml:1, topic:"TOPIK I · Syllables", exp:"ㄱ(g) + ㅏ(a) = 가 (ga). Korean builds syllables like blocks! 🧩"},
+      {q:"나 = ?", opts:["ga","na","da","ra"], a:1, ml:1, topic:"TOPIK I · Syllables", exp:"ㄴ(n) + ㅏ(a) = 나 (na). Also means 'I/me' in casual speech! 👤"},
+      {q:"한 = ?", opts:["han","hae","hon","hun"], a:0, ml:1, topic:"TOPIK I · 받침", exp:"ㅎ+ㅏ+ㄴ = 한 (han). With final consonant (받침)! As in 한국 (Korea)! 🇰🇷"},
+      {q:"밥 = ?", opts:["bab","bap","pap","bab"], a:1, ml:1, topic:"TOPIK I · 받침", exp:"ㅂ+ㅏ+ㅂ = 밥 (bap). The final ㅂ sounds like 'p'. 받침 changes sounds! 🍚"},
+      {q:"한국 = ?", opts:["hanguk","hangook","hankuk","hangug"], a:0, ml:1, topic:"TOPIK I · Reading", exp:"한국 (Hanguk) = Korea. 한 = Korean, 국 = country! 🇰🇷"},
+      {q:"Hello (polite):", opts:["감사합니다","안녕하세요","미안합니다","괜찮아요"], a:1, ml:31, topic:"TOPIK I · Greetings", exp:"안녕하세요 (annyeonghaseyo) = Hello! Literally 'Are you at peace?' 👋"},
+      {q:"Thank you (formal):", opts:["안녕하세요","미안합니다","감사합니다","네"], a:2, ml:31, topic:"TOPIK I · Greetings", exp:"감사합니다 (gamsahamnida) = Thank you (formal). Casual: 고마워요! 🙏"},
+      {q:"Sorry (formal):", opts:["감사합니다","네","아니요","미안합니다"], a:3, ml:31, topic:"TOPIK I · Greetings", exp:"미안합니다 (mianhamnida) = I'm sorry. Casual: 미안해요. 🙇"},
+      {q:"Goodbye (to one leaving):", opts:["안녕히 가세요","안녕히 계세요","안녕하세요","감사합니다"], a:0, ml:31, topic:"TOPIK I · Greetings", exp:"안녕히 가세요 = Go well! (said to person leaving). 계세요 = Stay well. 👋"},
+      {q:"Goodbye (to one staying):", opts:["안녕히 가세요","안녕히 계세요","잘 가요","다녀오세요"], a:1, ml:31, topic:"TOPIK I · Greetings", exp:"안녕히 계세요 = Stay well! (said when YOU are leaving). 🏠"},
+      {q:"It's okay:", opts:["미안해요","괜찮아요","아파요","싫어요"], a:1, ml:31, topic:"TOPIK I · Expressions", exp:"괜찮아요 (gwaenchanhayo) = It's okay / I'm fine. Very versatile! 👍"},
+      {q:"Please give me ___:", opts:["___이에요","___ 주세요","___ 있어요","___ 없어요"], a:1, ml:31, topic:"TOPIK I · Expressions", exp:"___ 주세요 (juseyo) = Please give me ___. 물 주세요 = Water, please! 🙋"},
+      {q:"Nice to meet you:", opts:["만나서 반갑습니다","잘 먹겠습니다","잘 부탁드립니다","수고하셨습니다"], a:0, ml:31, topic:"TOPIK I · Greetings", exp:"만나서 반갑습니다 = Nice to meet you. Used in introductions! 🤝"},
+      {q:"Yes:", opts:["아니요","네/예","왜","뭐"], a:1, ml:31, topic:"TOPIK I · Basics", exp:"네 (ne) or 예 (ye) = Yes. 예 is slightly more formal. ✅"},
+      {q:"No:", opts:["네","아니요","예","맞아요"], a:1, ml:31, topic:"TOPIK I · Basics", exp:"아니요 (aniyo) = No. 아니 (ani) is casual. ❌"},
+      {q:"하나 = ?", opts:["1","2","3","4"], a:0, ml:61, topic:"TOPIK I · 고유어 수", exp:"하나 (hana) = 1. Used for hours, age, counting objects! ☝️"},
+      {q:"둘 = ?", opts:["1","2","3","4"], a:1, ml:61, topic:"TOPIK I · 고유어 수", exp:"둘 (dul) = 2. Before counters: 둘 → 두. 두 개 = 2 things. ✌️"},
+      {q:"셋 = ?", opts:["2","3","4","5"], a:1, ml:61, topic:"TOPIK I · 고유어 수", exp:"셋 (set) = 3. Before counters: 셋 → 세. 세 시 = 3 o'clock! 🕒"},
+      {q:"열 = ?", opts:["5","8","10","20"], a:2, ml:61, topic:"TOPIK I · 고유어 수", exp:"열 (yeol) = 10. 열한, 열둘, 열셋... = 11, 12, 13. 🔟"},
+      {q:"스물 = ?", opts:["10","15","20","30"], a:2, ml:61, topic:"TOPIK I · 고유어 수", exp:"스물 (seumul) = 20. Before counters: 스물 → 스무. 2️⃣0️⃣"},
+      {q:"일 = ?", opts:["1","2","3","4"], a:0, ml:61, topic:"TOPIK I · 한자어 수", exp:"일 (il) = 1. Used for dates, money, phone numbers. From Chinese 一! 1️⃣"},
+      {q:"삼 = ?", opts:["1","2","3","4"], a:2, ml:61, topic:"TOPIK I · 한자어 수", exp:"삼 (sam) = 3. 삼월 = March. From Chinese 三! 3️⃣"},
+      {q:"십 = ?", opts:["4","7","10","100"], a:2, ml:61, topic:"TOPIK I · 한자어 수", exp:"십 (sip) = 10. 십일 = 11, 이십 = 20, 삼십 = 30. 🔟"},
+      {q:"백 = ?", opts:["10","100","1000","10000"], a:1, ml:61, topic:"TOPIK I · 한자어 수", exp:"백 (baek) = 100. 이백 = 200. Used for prices! 💯"},
+      {q:"천 = ?", opts:["100","1000","10000","million"], a:1, ml:61, topic:"TOPIK I · 한자어 수", exp:"천 (cheon) = 1,000. 오천 원 = 5,000 won! 💵"},
+      {q:"월요일 = ?", opts:["Monday","Tuesday","Sunday","Friday"], a:0, ml:61, topic:"TOPIK I · 요일", exp:"월요일: 월 = moon. Moon-day = Monday! 🌙"},
+      {q:"일요일 = ?", opts:["Monday","Saturday","Sunday","Friday"], a:2, ml:61, topic:"TOPIK I · 요일", exp:"일요일: 일 = sun. Sun-day = Sunday! ☀️"},
+      {q:"오늘 means?", opts:["yesterday","today","tomorrow","always"], a:1, ml:61, topic:"TOPIK I · 시간", exp:"오늘 (oneul) = today. 어제 = yesterday, 내일 = tomorrow! 📅"},
+      {q:"지금 means?", opts:["later","before","now","after"], a:2, ml:61, topic:"TOPIK I · 시간", exp:"지금 (jigeum) = now. 지금 뭐 해요? = What are you doing now? ⏰"},
+      {q:"세 시 = ?", opts:["1 o'clock","2 o'clock","3 o'clock","4 o'clock"], a:2, ml:61, topic:"TOPIK I · 시간", exp:"시 = o'clock. Uses NATIVE numbers: 한 시(1), 두 시(2), 세 시(3)! 🕒"},
+      {q:"삼월 = ?", opts:["January","February","March","April"], a:2, ml:61, topic:"TOPIK I · 날짜", exp:"Months use Sino numbers + 월: 일월(Jan), 이월(Feb), 삼월(Mar)... 📆"},
+      {q:"엄마 means?", opts:["dad","mom","sister","grandma"], a:1, ml:101, topic:"TOPIK I · 가족", exp:"엄마 (eomma) = mom. Formal: 어머니 (eomeoni). 👩"},
+      {q:"아빠 means?", opts:["dad","mom","brother","grandpa"], a:0, ml:101, topic:"TOPIK I · 가족", exp:"아빠 (appa) = dad. Formal: 아버지 (abeoji). 👨"},
+      {q:"언니 is used by:", opts:["younger brother","younger sister","older brother","older sister"], a:1, ml:101, topic:"TOPIK I · 가족", exp:"언니 = older sister, used by GIRLS. Boys say 누나 instead! 👧→👩"},
+      {q:"형 is used by:", opts:["girls to older brother","boys to older brother","girls to older sister","anyone"], a:1, ml:101, topic:"TOPIK I · 가족", exp:"형 = older brother, used by BOYS. Girls say 오빠 instead! 👦→👨"},
+      {q:"동생 means?", opts:["older sibling","younger sibling","cousin","friend"], a:1, ml:101, topic:"TOPIK I · 가족", exp:"동생 = younger sibling. 남동생 = younger brother, 여동생 = younger sister! 👶"},
+      {q:"물 means?", opts:["fire","water","food","rice"], a:1, ml:101, topic:"TOPIK I · 음식", exp:"물 (mul) = water. 물 주세요 = Water please! 💧"},
+      {q:"밥 means?", opts:["water","bread","rice/meal","meat"], a:2, ml:101, topic:"TOPIK I · 음식", exp:"밥 (bap) = rice or meal. 밥 먹었어요? = Did you eat? (a greeting!) 🍚"},
+      {q:"고기 means?", opts:["fish","chicken","meat","vegetable"], a:2, ml:101, topic:"TOPIK I · 음식", exp:"고기 (gogi) = meat. 소고기=beef, 돼지고기=pork, 닭고기=chicken! 🥩"},
+      {q:"맛있어요 means?", opts:["it's spicy","it's delicious","I'm hungry","it's expensive"], a:1, ml:101, topic:"TOPIK I · 음식", exp:"맛있어요 = It's delicious! 맛 = taste, 있다 = exists. Tasty! 😋"},
+      {q:"배고파요 means?", opts:["I'm full","I'm thirsty","I'm hungry","I'm tired"], a:2, ml:101, topic:"TOPIK I · 음식", exp:"배고파요 = I'm hungry. 배 = stomach, 고프다 = empty! 🤤"},
+      {q:"학교 means?", opts:["home","school","hospital","office"], a:1, ml:101, topic:"TOPIK I · 장소", exp:"학교 (hakgyo) = school. 학=study, 교=teaching. 🏫"},
+      {q:"집 means?", opts:["school","store","house","car"], a:2, ml:101, topic:"TOPIK I · 장소", exp:"집 (jip) = house/home. 집에 가요 = Going home! 🏠"},
+      {q:"병원 means?", opts:["school","bank","hospital","store"], a:2, ml:101, topic:"TOPIK I · 장소", exp:"병원 = hospital. 병=sick, 원=institution. 🏥"},
+      {q:"빨간색 = ?", opts:["blue","red","green","yellow"], a:1, ml:101, topic:"TOPIK I · 색깔", exp:"빨간색 = red. 색 = color. 🔴"},
+      {q:"파란색 = ?", opts:["blue","red","green","white"], a:0, ml:101, topic:"TOPIK I · 색깔", exp:"파란색 = blue. 파란 하늘 = blue sky! 🔵"},
+      {q:"노란색 = ?", opts:["green","white","black","yellow"], a:3, ml:101, topic:"TOPIK I · 색깔", exp:"노란색 = yellow. 🟡"},
+      {q:"은/는 marks the:", opts:["subject","topic","object","place"], a:1, ml:221, topic:"TOPIK I · 조사", exp:"은/는 = topic marker. 저는 학생이에요 = As for me, I'm a student. 📌"},
+      {q:"이/가 marks the:", opts:["topic","subject","object","time"], a:1, ml:221, topic:"TOPIK I · 조사", exp:"이/가 = subject marker. 비가 와요 = Rain comes. New info focus! 🎯"},
+      {q:"을/를 marks the:", opts:["topic","subject","object","place"], a:2, ml:221, topic:"TOPIK I · 조사", exp:"을/를 = object marker. 밥을 먹어요 = I eat rice. 🍽️"},
+      {q:"에 marks:", opts:["object","topic","location/time","subject"], a:2, ml:221, topic:"TOPIK I · 조사", exp:"에 = location or time. 학교에 가요 = Go TO school. 3시에 = AT 3. 📍"},
+      {q:"에서 marks:", opts:["direction","location of action","time","object"], a:1, ml:221, topic:"TOPIK I · 조사", exp:"에서 = where action happens. 학교에서 공부해요 = Study AT school. ✏️"},
+      {q:"도 means:", opts:["only","also/too","but","and"], a:1, ml:221, topic:"TOPIK I · 조사", exp:"도 = also/too. 나도! = Me too! ➕"},
+      {q:"와/과 means:", opts:["or","but","and/with","only"], a:2, ml:221, topic:"TOPIK I · 조사", exp:"와/과 = and/with. 친구와 같이 = together with a friend. 🤝"},
+      {q:"먹다 = ?", opts:["to sleep","to eat","to go","to see"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"먹다 = to eat. Polite: 먹어요. Past: 먹었어요. 🍽️"},
+      {q:"가다 = ?", opts:["to come","to eat","to go","to sit"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"가다 = to go. Polite: 가요. 학교에 가요! 🚶"},
+      {q:"오다 = ?", opts:["to go","to come","to run","to fly"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"오다 = to come. Opposite of 가다! 여기 오세요 = Come here! 🏃→"},
+      {q:"하다 = ?", opts:["to be","to do","to have","to see"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"하다 = to do. 공부하다=study, 일하다=work, 운동하다=exercise! ⚡"},
+      {q:"보다 = ?", opts:["to eat","to sleep","to see/watch","to read"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"보다 = to see/watch. 영화를 봐요 = I watch a movie! 👀"},
+      {q:"사다 = ?", opts:["to sell","to buy","to give","to use"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"사다 = to buy. 뭘 사요? = What are you buying? 🛍️"},
+      {q:"자다 = ?", opts:["to eat","to run","to sleep","to sit"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"자다 = to sleep. 잘 자요 = Sleep well! 😴"},
+      {q:"있다 = ?", opts:["to not exist","to exist/have","to go","to do"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"있다 = to exist/have. 시간이 있어요 = I have time! ✅"},
+      {q:"좋다 = ?", opts:["bad","big","good","small"], a:2, ml:161, topic:"TOPIK I · 형용사", exp:"좋다 = good. 좋아요! = It's good / I like it! 👍"},
+      {q:"크다 = ?", opts:["small","fast","big/tall","short"], a:2, ml:161, topic:"TOPIK I · 형용사", exp:"크다 = big/tall. Opposite: 작다 (small)! 📏"},
+      {q:"비싸다 = ?", opts:["cheap","expensive","free","heavy"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"비싸다 = expensive. Opposite: 싸다 (cheap). 💸"},
+      {q:"재미있다 = ?", opts:["boring","difficult","fun/interesting","scary"], a:2, ml:161, topic:"TOPIK I · 형용사", exp:"재미있다 = fun/interesting. 재미 = fun + 있다 = exists! 🎉"},
+      {q:"뭐 = ?", opts:["who","what","where","when"], a:1, ml:281, topic:"TOPIK I · 의문사", exp:"뭐 = what. 뭐 해요? = What are you doing? ❓"},
+      {q:"누구 = ?", opts:["what","where","who","how"], a:2, ml:281, topic:"TOPIK I · 의문사", exp:"누구 = who. 누구예요? = Who is it? 👤"},
+      {q:"어디 = ?", opts:["when","where","who","why"], a:1, ml:281, topic:"TOPIK I · 의문사", exp:"어디 = where. 어디에 가요? = Where are you going? 🗺️"},
+      {q:"왜 = ?", opts:["where","when","how","why"], a:3, ml:281, topic:"TOPIK I · 의문사", exp:"왜 = why. 왜요? = Why? 🤔"},
+      {q:"어떻게 = ?", opts:["what","where","how","who"], a:2, ml:281, topic:"TOPIK I · 의문사", exp:"어떻게 = how. 어떻게 해요? = How do you do it? 🔧"},
+      {q:"Polite present of 가다:", opts:["갔어요","가요","갈 거예요","가자"], a:1, ml:421, topic:"TOPIK I · 해요체", exp:"가다 → 가요. Drop -다, add -아요/-어요. 가 ends in ㅏ, just add -요! ✨"},
+      {q:"Past tense of 가다:", opts:["가요","갔어요","갈 거예요","가고"], a:1, ml:421, topic:"TOPIK I · 과거", exp:"가다 → 갔어요. Past = stem + 았/었 + 어요. 가+았 contracts to 갔! ⏪"},
+      {q:"Future of 먹다:", opts:["먹었어요","먹어요","먹을 거예요","먹자"], a:2, ml:421, topic:"TOPIK I · 미래", exp:"먹다 → 먹을 거예요 = will eat. -(으)ㄹ 거예요 = future! ⏩"},
+      {q:"안 means:", opts:["very","not","also","only"], a:1, ml:281, topic:"TOPIK I · 부정", exp:"안 = not. 안 먹어요 = don't eat. Simple negation! 🚫"},
+      {q:"못 means:", opts:["not","cannot","must","should"], a:1, ml:281, topic:"TOPIK I · 부정", exp:"못 = cannot. 못 해요 = can't do it. Shows inability! 🚫"},
+      {q:"-고 싶다 means:", opts:["must do","want to","have to","can do"], a:1, ml:421, topic:"TOPIK I · 문법", exp:"-고 싶다 = want to. 먹고 싶어요 = I want to eat! 💭"},
+      {q:"개 counts:", opts:["people","general things","animals","drinks"], a:1, ml:421, topic:"TOPIK I · 단위", exp:"개 = counter for general things. 사과 두 개 = 2 apples! 📦"},
+      {q:"명 counts:", opts:["things","people","animals","books"], a:1, ml:421, topic:"TOPIK I · 단위", exp:"명 = counter for people. 세 명 = 3 people! 👥"},
+      {q:"마리 counts:", opts:["things","people","animals","cups"], a:2, ml:421, topic:"TOPIK I · 단위", exp:"마리 = counter for animals. 고양이 한 마리 = 1 cat! 🐾"},
+      {q:"고양이 = ?", opts:["dog","cat","bird","fish"], a:1, ml:101, topic:"TOPIK I · 동물", exp:"고양이 = cat. Korean cats say 야옹! 🐱"},
+      {q:"강아지 = ?", opts:["cat","puppy/dog","rabbit","bird"], a:1, ml:101, topic:"TOPIK I · 동물", exp:"강아지 = puppy. 개 = dog (general). 🐶"},
+      {q:"저는 ___이에요:", opts:["I am ___","You are ___","This is ___","There is ___"], a:0, ml:281, topic:"TOPIK I · 자기소개", exp:"저는 ___이에요 = I am ___. 저=I, 는=topic, 이에요=am! 👤"},
+      {q:"이것 means:", opts:["that thing","this thing","what thing","which"], a:1, ml:281, topic:"TOPIK I · 지시사", exp:"이것 = this thing (near me). 그것 = that (near you). 저것 = that (far). 👆"},
+      {q:"___이/가 아니에요:", opts:["is ___","is not ___","has ___","wants ___"], a:1, ml:281, topic:"TOPIK I · 부정", exp:"이/가 아니에요 = is not. 학생이 아니에요 = I'm not a student! ❌"},
+      // --- Body Parts ---
+      {q:"머리 means?", opts:["hand","head","foot","eye"], a:1, ml:101, topic:"TOPIK I · 신체", exp:"머리 (meori) = head/hair. 머리가 아파요 = I have a headache! 🤕"},
+      {q:"눈 means?", opts:["ear","nose","eye","mouth"], a:2, ml:101, topic:"TOPIK I · 신체", exp:"눈 (nun) = eye. Also means snow! 눈이 와요 = It's snowing / Eyes come. Context matters! 👁️"},
+      {q:"코 means?", opts:["ear","nose","mouth","hand"], a:1, ml:101, topic:"TOPIK I · 신체", exp:"코 (ko) = nose. 코가 높다 = nose is tall (literal). 👃"},
+      {q:"입 means?", opts:["eye","ear","nose","mouth"], a:3, ml:101, topic:"TOPIK I · 신체", exp:"입 (ip) = mouth. 입이 크다 = big mouth! 👄"},
+      {q:"귀 means?", opts:["eye","mouth","ear","nose"], a:2, ml:101, topic:"TOPIK I · 신체", exp:"귀 (gwi) = ear. 귀가 아파요 = My ear hurts! 👂"},
+      {q:"손 means?", opts:["foot","hand","arm","leg"], a:1, ml:101, topic:"TOPIK I · 신체", exp:"손 (son) = hand. 손을 씻으세요 = Please wash your hands! ✋"},
+      {q:"발 means?", opts:["hand","arm","foot","head"], a:2, ml:101, topic:"TOPIK I · 신체", exp:"발 (bal) = foot. 발이 아파요 = My foot hurts! 🦶"},
+      {q:"배 means?", opts:["back","stomach","chest","arm"], a:1, ml:101, topic:"TOPIK I · 신체", exp:"배 (bae) = stomach. Also means pear or boat! 배고파요 = I'm hungry! 🤰"},
+      {q:"다리 means?", opts:["arm","hand","leg","head"], a:2, ml:101, topic:"TOPIK I · 신체", exp:"다리 (dari) = leg. Also means bridge! 다리가 길어요 = Long legs! 🦵"},
+      {q:"어깨 means?", opts:["knee","shoulder","elbow","wrist"], a:1, ml:101, topic:"TOPIK I · 신체", exp:"어깨 (eokkae) = shoulder. 어깨가 아파요 = My shoulder hurts! 💪"},
+      {q:"아프다 means?", opts:["happy","hungry","sick/hurt","tired"], a:2, ml:101, topic:"TOPIK I · 신체", exp:"아프다 (apeuda) = to be sick/hurt. 어디가 아파요? = Where does it hurt? 🤒"},
+      // --- Weather & Seasons ---
+      {q:"날씨 means?", opts:["time","weather","season","temperature"], a:1, ml:101, topic:"TOPIK I · 날씨", exp:"날씨 (nalssi) = weather. 오늘 날씨가 좋아요 = The weather is nice today! 🌤️"},
+      {q:"비 means?", opts:["snow","rain","wind","cloud"], a:1, ml:101, topic:"TOPIK I · 날씨", exp:"비 (bi) = rain. 비가 와요 = It's raining! 비 comes using 오다 (come)! 🌧️"},
+      {q:"눈 (weather) means?", opts:["rain","snow","wind","sun"], a:1, ml:101, topic:"TOPIK I · 날씨", exp:"눈 (nun) = snow (also = eye!). 눈이 와요 = It's snowing! ❄️"},
+      {q:"바람 means?", opts:["rain","snow","wind","cloud"], a:2, ml:101, topic:"TOPIK I · 날씨", exp:"바람 (baram) = wind. 바람이 불어요 = The wind is blowing! 💨"},
+      {q:"덥다 means?", opts:["cold","hot","warm","cool"], a:1, ml:101, topic:"TOPIK I · 날씨", exp:"덥다 (deopda) = hot (weather). 오늘 너무 더워요 = It's so hot today! 🥵"},
+      {q:"춥다 means?", opts:["hot","cold","warm","cool"], a:1, ml:101, topic:"TOPIK I · 날씨", exp:"춥다 (chupda) = cold (weather). 겨울에 추워요 = It's cold in winter! 🥶"},
+      {q:"봄 means?", opts:["spring","summer","autumn","winter"], a:0, ml:101, topic:"TOPIK I · 계절", exp:"봄 (bom) = spring. 봄에 꽃이 피어요 = Flowers bloom in spring! 🌸"},
+      {q:"여름 means?", opts:["spring","summer","autumn","winter"], a:1, ml:101, topic:"TOPIK I · 계절", exp:"여름 (yeoreum) = summer. 여름에 바다에 가요 = Go to the sea in summer! 🏖️"},
+      {q:"가을 means?", opts:["spring","summer","autumn","winter"], a:2, ml:101, topic:"TOPIK I · 계절", exp:"가을 (gaeul) = autumn/fall. 가을에 단풍이 예뻐요 = Autumn leaves are pretty! 🍂"},
+      {q:"겨울 means?", opts:["spring","summer","autumn","winter"], a:3, ml:101, topic:"TOPIK I · 계절", exp:"겨울 (gyeoul) = winter. 겨울에 눈이 와요 = It snows in winter! ⛄"},
+      // --- Clothing ---
+      {q:"옷 means?", opts:["shoes","hat","clothes","bag"], a:2, ml:101, topic:"TOPIK I · 의류", exp:"옷 (ot) = clothes. 옷을 입다 = to wear clothes. 새 옷 = new clothes! 👔"},
+      {q:"신발 means?", opts:["hat","clothes","shoes","socks"], a:2, ml:101, topic:"TOPIK I · 의류", exp:"신발 (sinbal) = shoes. 신발을 신다 = to wear shoes. 벗다 = take off! 👟"},
+      {q:"모자 means?", opts:["shoes","hat","gloves","scarf"], a:1, ml:101, topic:"TOPIK I · 의류", exp:"모자 (moja) = hat/cap. 모자를 쓰다 = to wear a hat! 🧢"},
+      {q:"입다 means?", opts:["to eat","to wear (clothes)","to read","to buy"], a:1, ml:101, topic:"TOPIK I · 의류", exp:"입다 (ipda) = to wear (upper body/clothes). 셔츠를 입어요 = I wear a shirt! 👕"},
+      {q:"신다 means?", opts:["to wear (hat)","to wear (shoes)","to wear (clothes)","to take off"], a:1, ml:101, topic:"TOPIK I · 의류", exp:"신다 (sinda) = to wear (shoes/socks). Korean has different 'wear' verbs for each body part! 👟"},
+      // --- Transportation ---
+      {q:"버스 means?", opts:["train","taxi","bus","airplane"], a:2, ml:351, topic:"TOPIK I · 교통", exp:"버스 (beoseu) = bus. Loanword from English! 버스를 타다 = ride a bus! 🚌"},
+      {q:"지하철 means?", opts:["bus","subway","train","taxi"], a:1, ml:351, topic:"TOPIK I · 교통", exp:"지하철 (jihacheol) = subway. 지하=underground, 철=railroad! 🚇"},
+      {q:"택시 means?", opts:["bus","train","subway","taxi"], a:3, ml:351, topic:"TOPIK I · 교통", exp:"택시 (taeksi) = taxi. Loanword! 택시를 타요 = I take a taxi! 🚕"},
+      {q:"비행기 means?", opts:["bus","ship","train","airplane"], a:3, ml:351, topic:"TOPIK I · 교통", exp:"비행기 (bihaenggi) = airplane. 비행=flight, 기=machine! ✈️"},
+      {q:"타다 means?", opts:["to walk","to ride/take","to drive","to stop"], a:1, ml:351, topic:"TOPIK I · 교통", exp:"타다 (tada) = to ride/take (transport). 버스를 타요 = I take the bus! 🚌"},
+      {q:"내리다 means?", opts:["to get on","to get off","to drive","to wait"], a:1, ml:351, topic:"TOPIK I · 교통", exp:"내리다 (naerida) = to get off. 여기서 내리세요 = Get off here! 🚏"},
+      {q:"역 means?", opts:["bus stop","train station","airport","parking"], a:1, ml:351, topic:"TOPIK I · 교통", exp:"역 (yeok) = station. 서울역 = Seoul Station. 지하철역 = subway station! 🚉"},
+      {q:"걷다 means?", opts:["to run","to walk","to sit","to stand"], a:1, ml:351, topic:"TOPIK I · 교통", exp:"걷다 (geotda) = to walk. Irregular verb! 걸어요 (polite). 걸어서 가요 = Go on foot! 🚶"},
+      // --- Shopping & Money ---
+      {q:"얼마예요? means?", opts:["What is this?","How much?","Where is it?","When?"], a:1, ml:351, topic:"TOPIK I · 쇼핑", exp:"얼마예요? = How much is it? 이거 얼마예요? = How much is this? Essential for shopping! 💰"},
+      {q:"원 means?", opts:["dollar","won (currency)","euro","yen"], a:1, ml:351, topic:"TOPIK I · 쇼핑", exp:"원 (won) = Korean currency unit. 천 원 = 1,000 won (~$0.75 USD). 💵"},
+      {q:"싸다 means?", opts:["expensive","cheap","free","heavy"], a:1, ml:351, topic:"TOPIK I · 쇼핑", exp:"싸다 (ssada) = cheap. Opposite of 비싸다 (expensive). 싸요! = It's cheap! 💸"},
+      {q:"가게 means?", opts:["house","school","store/shop","restaurant"], a:2, ml:351, topic:"TOPIK I · 쇼핑", exp:"가게 (gage) = store/shop. 편의점 = convenience store! 🏪"},
+      {q:"카드 means?", opts:["cash","card","check","coin"], a:1, ml:351, topic:"TOPIK I · 쇼핑", exp:"카드 (kadeu) = card. 카드로 할게요 = I'll pay by card! 💳"},
+      {q:"영수증 means?", opts:["menu","card","receipt","change"], a:2, ml:351, topic:"TOPIK I · 쇼핑", exp:"영수증 (yeongsujeung) = receipt. 영수증 주세요 = Receipt please! 🧾"},
+      {q:"깎아 주세요:", opts:["Wrap it please","Discount please","Give me more","Change please"], a:1, ml:351, topic:"TOPIK I · 쇼핑", exp:"깎아 주세요 = Please give a discount! 깎다 = to cut/reduce price. Use at markets! 🏷️"},
+      // --- Emotions & States ---
+      {q:"기쁘다 means?", opts:["sad","happy/glad","angry","bored"], a:1, ml:351, topic:"TOPIK I · 감정", exp:"기쁘다 (gippeuda) = glad/happy. 만나서 기뻐요 = Glad to meet you! 😊"},
+      {q:"슬프다 means?", opts:["happy","angry","sad","scared"], a:2, ml:351, topic:"TOPIK I · 감정", exp:"슬프다 (seulpeuda) = sad. 슬픈 영화 = sad movie. 너무 슬퍼요! 😢"},
+      {q:"화나다 means?", opts:["happy","sad","angry","scared"], a:2, ml:351, topic:"TOPIK I · 감정", exp:"화나다 (hwanada) = to be angry. 화가 났어요 = I got angry! 😡"},
+      {q:"무섭다 means?", opts:["happy","sad","angry","scary/scared"], a:3, ml:351, topic:"TOPIK I · 감정", exp:"무섭다 (museopda) = scary/scared. 무서워요! = I'm scared! 😱"},
+      {q:"피곤하다 means?", opts:["hungry","thirsty","tired","sick"], a:2, ml:351, topic:"TOPIK I · 감정", exp:"피곤하다 (pigonhada) = tired. 오늘 너무 피곤해요 = So tired today! 😫"},
+      {q:"심심하다 means?", opts:["hungry","bored","sleepy","angry"], a:1, ml:351, topic:"TOPIK I · 감정", exp:"심심하다 (simsimhada) = bored. 심심해요! 뭐 할까요? = I'm bored! What shall we do? 😐"},
+      {q:"걱정하다 means?", opts:["to enjoy","to worry","to relax","to forget"], a:1, ml:351, topic:"TOPIK I · 감정", exp:"걱정하다 (geokjeonghada) = to worry. 걱정하지 마세요 = Don't worry! 😟"},
+      {q:"부끄럽다 means?", opts:["proud","shy/embarrassed","brave","angry"], a:1, ml:351, topic:"TOPIK I · 감정", exp:"부끄럽다 (bukkeureopda) = shy/embarrassed. 부끄러워요! = I'm embarrassed! 😳"},
+      {q:"외롭다 means?", opts:["happy","busy","lonely","full"], a:2, ml:351, topic:"TOPIK I · 감정", exp:"외롭다 (oeropda) = lonely. 혼자서 외로워요 = Lonely being alone. 🥺"},
+      // --- Occupations ---
+      {q:"학생 means?", opts:["teacher","student","doctor","worker"], a:1, ml:351, topic:"TOPIK I · 직업", exp:"학생 (haksaeng) = student. 학=study, 생=life/person. 🎒"},
+      {q:"선생님 means?", opts:["student","doctor","teacher","friend"], a:2, ml:351, topic:"TOPIK I · 직업", exp:"선생님 (seonsaengnim) = teacher. 님 = honorific suffix. Also used for any professional! 👨‍🏫"},
+      {q:"의사 means?", opts:["nurse","doctor","dentist","teacher"], a:1, ml:351, topic:"TOPIK I · 직업", exp:"의사 (uisa) = doctor. 의=medicine, 사=person. 병원에 의사가 있어요! 👨‍⚕️"},
+      {q:"경찰 means?", opts:["firefighter","soldier","police","driver"], a:2, ml:351, topic:"TOPIK I · 직업", exp:"경찰 (gyeongchal) = police. 경찰관 = police officer. 🚔"},
+      {q:"요리사 means?", opts:["driver","cook/chef","nurse","singer"], a:1, ml:351, topic:"TOPIK I · 직업", exp:"요리사 (yorisa) = cook/chef. 요리=cooking, 사=person. 요리를 잘해요! 👨‍🍳"},
+      {q:"가수 means?", opts:["actor","dancer","singer","writer"], a:2, ml:351, topic:"TOPIK I · 직업", exp:"가수 (gasu) = singer. 가=song, 수=person. K-pop 가수! 🎤"},
+      {q:"회사원 means?", opts:["teacher","office worker","doctor","student"], a:1, ml:351, topic:"TOPIK I · 직업", exp:"회사원 (hoesawon) = office worker. 회사=company, 원=member. 🏢"},
+      // --- Hobbies & Activities ---
+      {q:"운동 means?", opts:["music","exercise/sports","reading","cooking"], a:1, ml:351, topic:"TOPIK I · 취미", exp:"운동 (undong) = exercise/sports. 운동하다 = to exercise. 운동을 좋아해요! 🏃"},
+      {q:"음악 means?", opts:["movie","music","dance","book"], a:1, ml:351, topic:"TOPIK I · 취미", exp:"음악 (eumak) = music. 음악을 듣다 = to listen to music. K-pop! 🎵"},
+      {q:"영화 means?", opts:["music","drama","movie","book"], a:2, ml:351, topic:"TOPIK I · 취미", exp:"영화 (yeonghwa) = movie/film. 영화를 봐요 = I watch a movie! 🎬"},
+      {q:"사진 means?", opts:["music","video","painting","photo"], a:3, ml:351, topic:"TOPIK I · 취미", exp:"사진 (sajin) = photo. 사진을 찍다 = to take a photo! 📷"},
+      {q:"요리 means?", opts:["exercise","cooking","reading","singing"], a:1, ml:351, topic:"TOPIK I · 취미", exp:"요리 (yori) = cooking. 요리하다 = to cook. 요리를 잘해요 = I cook well! 🍳"},
+      {q:"노래 means?", opts:["dance","music","song","movie"], a:2, ml:351, topic:"TOPIK I · 취미", exp:"노래 (norae) = song. 노래를 부르다 = to sing a song. 노래방 = karaoke! 🎶"},
+      {q:"여행하다 means?", opts:["to study","to travel","to work","to exercise"], a:1, ml:351, topic:"TOPIK I · 취미", exp:"여행하다 (yeohaenghada) = to travel. 여행 가고 싶어요 = I want to travel! ✈️"},
+      {q:"수영 means?", opts:["running","cycling","swimming","hiking"], a:2, ml:351, topic:"TOPIK I · 취미", exp:"수영 (suyeong) = swimming. 수영하다 = to swim. 수영장 = swimming pool! 🏊"},
+      {q:"등산 means?", opts:["swimming","cycling","running","hiking"], a:3, ml:351, topic:"TOPIK I · 취미", exp:"등산 (deungsan) = hiking/mountain climbing. 등=climb, 산=mountain! 🏔️"},
+      // --- More Verbs ---
+      {q:"마시다 = ?", opts:["to eat","to drink","to cook","to wash"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"마시다 (masida) = to drink. 물을 마셔요 = I drink water! 🥤"},
+      {q:"듣다 = ?", opts:["to speak","to read","to listen","to see"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"듣다 (deutda) = to listen. Irregular! 들어요 (polite). 음악을 들어요! 👂"},
+      {q:"말하다 = ?", opts:["to listen","to speak/say","to read","to write"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"말하다 (malhada) = to speak/say. 한국어로 말해 주세요 = Please speak in Korean! 🗣️"},
+      {q:"알다 = ?", opts:["to forget","to know","to learn","to teach"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"알다 (alda) = to know. 알아요 = I know. 몰라요 = I don't know! 🧠"},
+      {q:"모르다 = ?", opts:["to know","to not know","to forget","to remember"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"모르다 (moreuda) = to not know. 몰라요 = I don't know. Opposite of 알다! ❓"},
+      {q:"만나다 = ?", opts:["to leave","to call","to meet","to miss"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"만나다 (mannada) = to meet. 친구를 만나요 = I meet a friend! 🤝"},
+      {q:"주다 = ?", opts:["to take","to give","to buy","to sell"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"주다 (juda) = to give. 줘요 (polite). 선물을 줘요 = I give a present! 🎁"},
+      {q:"받다 = ?", opts:["to give","to receive","to send","to throw"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"받다 (batda) = to receive. 선물을 받았어요 = I received a present! 📬"},
+      {q:"걸다 = ?", opts:["to walk","to call (phone)","to hang","to run"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"걸다 (geolda) = to call/hang. 전화를 걸다 = to make a phone call! 📞"},
+      {q:"앉다 = ?", opts:["to stand","to sit","to lie down","to run"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"앉다 (anda) = to sit. 앉으세요 = Please sit down! 🪑"},
+      {q:"서다 = ?", opts:["to sit","to stand","to walk","to fall"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"서다 (seoda) = to stand. 여기 서세요 = Stand here please! 🧍"},
+      {q:"열다 = ?", opts:["to close","to open","to lock","to push"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"열다 (yeolda) = to open. 문을 열어요 = Open the door! Opposite: 닫다 (close). 🚪"},
+      {q:"닫다 = ?", opts:["to open","to close","to lock","to break"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"닫다 (datda) = to close. 창문을 닫아요 = Close the window! 🪟"},
+      {q:"기다리다 = ?", opts:["to hurry","to wait","to leave","to arrive"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"기다리다 (gidarida) = to wait. 잠깐만 기다려 주세요 = Please wait a moment! ⏳"},
+      {q:"배우다 = ?", opts:["to teach","to learn","to study","to forget"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"배우다 (baeuda) = to learn. 한국어를 배워요 = I'm learning Korean! 📖"},
+      {q:"가르치다 = ?", opts:["to learn","to study","to teach","to read"], a:2, ml:161, topic:"TOPIK I · 동사", exp:"가르치다 (gareuchida) = to teach. 선생님이 가르쳐요 = The teacher teaches! 👩‍🏫"},
+      {q:"놀다 = ?", opts:["to work","to play/hang out","to sleep","to study"], a:1, ml:161, topic:"TOPIK I · 동사", exp:"놀다 (nolda) = to play/hang out. 같이 놀아요! = Let's hang out together! 🎉"},
+      // --- More Adjectives ---
+      {q:"작다 = ?", opts:["big","small","tall","heavy"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"작다 (jakda) = small. Opposite of 크다 (big). 작은 집 = small house! 🏠"},
+      {q:"길다 = ?", opts:["short","long","wide","narrow"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"길다 (gilda) = long. 머리가 길어요 = Hair is long! Opposite: 짧다 (short). 📏"},
+      {q:"짧다 = ?", opts:["long","short","tall","thin"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"짧다 (jjalda) = short (length). 짧은 치마 = short skirt. 📐"},
+      {q:"빠르다 = ?", opts:["slow","fast","heavy","light"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"빠르다 (ppareuda) = fast. 빨라요! = It's fast! Opposite: 느리다 (slow). 🏎️"},
+      {q:"느리다 = ?", opts:["fast","slow","heavy","light"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"느리다 (neurida) = slow. 너무 느려요 = Too slow! 🐢"},
+      {q:"무겁다 = ?", opts:["light","heavy","big","small"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"무겁다 (mugeopda) = heavy. 가방이 무거워요 = The bag is heavy! 🎒"},
+      {q:"가볍다 = ?", opts:["heavy","light","big","thick"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"가볍다 (gabyeopda) = light (weight). Opposite of 무겁다! 🪶"},
+      {q:"새롭다 = ?", opts:["old","new","same","different"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"새롭다 (saeropda) = new. 새 is also 'new': 새 옷 = new clothes! ✨"},
+      {q:"같다 = ?", opts:["different","same","similar","opposite"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"같다 (gatda) = same. 우리는 같아요 = We're the same! Opposite: 다르다. 🟰"},
+      {q:"다르다 = ?", opts:["same","different","similar","equal"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"다르다 (dareuda) = different. 달라요! = It's different! 🔄"},
+      {q:"쉽다 = ?", opts:["difficult","boring","easy","hard"], a:2, ml:161, topic:"TOPIK I · 형용사", exp:"쉽다 (swipda) = easy. 쉬워요! = It's easy! Opposite: 어렵다 (difficult). 😌"},
+      {q:"많다 = ?", opts:["few","many/much","all","some"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"많다 (manta) = many/much. 사람이 많아요 = There are many people! 👥"},
+      {q:"적다 = ?", opts:["many","few/little","all","none"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"적다 (jeokda) = few/little. Opposite of 많다! 돈이 적어요 = Little money! 💸"},
+      {q:"넓다 = ?", opts:["narrow","wide","tall","short"], a:1, ml:161, topic:"TOPIK I · 형용사", exp:"넓다 (neolda) = wide/spacious. 방이 넓어요 = The room is spacious! 🏠"},
+      // --- Daily Routine ---
+      {q:"일어나다 = ?", opts:["to sleep","to wake up","to eat","to wash"], a:1, ml:351, topic:"TOPIK I · 일상", exp:"일어나다 (ireonada) = to wake up/get up. 아침에 일어나요 = I wake up in the morning! ⏰"},
+      {q:"씻다 = ?", opts:["to eat","to sleep","to wash","to dress"], a:2, ml:351, topic:"TOPIK I · 일상", exp:"씻다 (ssitda) = to wash. 얼굴을 씻어요 = I wash my face! 🚿"},
+      {q:"출근하다 = ?", opts:["to go home","to go to work","to go to school","to exercise"], a:1, ml:351, topic:"TOPIK I · 일상", exp:"출근하다 (chulgeunhada) = to go to work. 출=out, 근=work. 아침에 출근해요! 🏢"},
+      {q:"퇴근하다 = ?", opts:["to go to work","to leave work","to go to school","to exercise"], a:1, ml:351, topic:"TOPIK I · 일상", exp:"퇴근하다 (toegeunhada) = to leave work. 6시에 퇴근해요 = I leave work at 6! 🏠"},
+      {q:"아침 means?", opts:["evening","morning","afternoon","night"], a:1, ml:351, topic:"TOPIK I · 일상", exp:"아침 (achim) = morning or breakfast. 아침을 먹었어요? = Did you eat breakfast? 🌅"},
+      {q:"점심 means?", opts:["breakfast","lunch","dinner","snack"], a:1, ml:351, topic:"TOPIK I · 일상", exp:"점심 (jeomsim) = lunch. 점심 먹었어요? = Did you eat lunch? 🍱"},
+      {q:"저녁 means?", opts:["morning","lunch","evening/dinner","night"], a:2, ml:351, topic:"TOPIK I · 일상", exp:"저녁 (jeonyeok) = evening or dinner. 저녁에 뭐 해요? = What do you do in the evening? 🌆"},
+      // --- Sentence Patterns & Grammar Practice ---
+      {q:"___에 가요 means?", opts:["come from ___","go to ___","live at ___","work at ___"], a:1, ml:281, topic:"TOPIK I · 문형", exp:"에 가요 = go to. 학교에 가요 = I go to school. 에 marks the destination! 🏫→"},
+      {q:"___에서 왔어요:", opts:["I go to ___","I came from ___","I live at ___","I work at ___"], a:1, ml:281, topic:"TOPIK I · 문형", exp:"에서 왔어요 = came from. 한국에서 왔어요 = I came from Korea! 🇰🇷"},
+      {q:"___을/를 좋아해요:", opts:["I have ___","I dislike ___","I like ___","I need ___"], a:2, ml:281, topic:"TOPIK I · 문형", exp:"을/를 좋아해요 = I like ___. 한국 음식을 좋아해요 = I like Korean food! ❤️"},
+      {q:"같이 means?", opts:["alone","together","separately","quickly"], a:1, ml:421, topic:"TOPIK I · 부사", exp:"같이 (gachi) = together. 같이 가요! = Let's go together! 같이 먹어요! 👫"},
+      {q:"혼자 means?", opts:["together","alone","everyone","nobody"], a:1, ml:421, topic:"TOPIK I · 부사", exp:"혼자 (honja) = alone. 혼자 살아요 = I live alone. 혼자서 = by oneself. 🧍"},
+      {q:"자주 means?", opts:["rarely","sometimes","often","never"], a:2, ml:421, topic:"TOPIK I · 부사", exp:"자주 (jaju) = often. 자주 와요 = I come often! 🔄"},
+      {q:"가끔 means?", opts:["always","never","sometimes","often"], a:2, ml:421, topic:"TOPIK I · 부사", exp:"가끔 (gakkeum) = sometimes. 가끔 영화를 봐요 = I sometimes watch movies. 🎬"},
+      {q:"항상 means?", opts:["never","sometimes","often","always"], a:3, ml:421, topic:"TOPIK I · 부사", exp:"항상 (hangsang) = always. 항상 감사합니다 = Thank you always! ♾️"},
+      {q:"아직 means?", opts:["already","still/yet","never","before"], a:1, ml:421, topic:"TOPIK I · 부사", exp:"아직 (ajik) = still/yet. 아직 안 먹었어요 = I haven't eaten yet! ⏳"},
+      {q:"벌써 means?", opts:["still","yet","already","never"], a:2, ml:421, topic:"TOPIK I · 부사", exp:"벌써 (beolsseo) = already. 벌써?! = Already?! Expresses surprise at speed! ⚡"},
+      {q:"너무 means?", opts:["not at all","a little","too much/very","just right"], a:2, ml:421, topic:"TOPIK I · 부사", exp:"너무 (neomu) = too much / very. 너무 비싸요! = Too expensive! 너무 좋아요 = So good! 🔥"},
+      {q:"잘 means?", opts:["badly","well","fast","slowly"], a:1, ml:421, topic:"TOPIK I · 부사", exp:"잘 (jal) = well. 잘 먹겠습니다 = I will eat well (said before eating)! 잘 자요 = Sleep well! ⭐"},
+      {q:"못 vs 안:", opts:["same meaning","못=cannot, 안=don't","못=don't, 안=cannot","both=cannot"], a:1, ml:421, topic:"TOPIK I · 부정 비교", exp:"못 = cannot (ability). 안 = don't (choice). 못 해요 = can't. 안 해요 = won't/don't! 🚫"},
+      // --- Practical Situations ---
+      {q:"메뉴 주세요:", opts:["Bill please","Menu please","Water please","Check please"], a:1, ml:351, topic:"TOPIK I · 식당", exp:"메뉴 주세요 = Menu please! Essential restaurant Korean! 📋"},
+      {q:"계산해 주세요:", opts:["Menu please","Order please","Bill/check please","More please"], a:2, ml:351, topic:"TOPIK I · 식당", exp:"계산해 주세요 = Bill/check please! 계산 = calculation/payment. 💳"},
+      {q:"화장실이 어디예요?", opts:["Where is the exit?","Where is the bathroom?","Where is the menu?","How much?"], a:1, ml:351, topic:"TOPIK I · 일상표현", exp:"화장실이 어디예요? = Where is the bathroom? 화장실 = restroom. Must-know! 🚻"},
+      {q:"도와주세요:", opts:["Leave me alone","Thank you","Help me please","Excuse me"], a:2, ml:351, topic:"TOPIK I · 일상표현", exp:"도와주세요 (dowajuseyo) = Help me please! 돕다 = to help. Emergency phrase! 🆘"},
+      {q:"천천히 means?", opts:["quickly","slowly","loudly","quietly"], a:1, ml:421, topic:"TOPIK I · 부사", exp:"천천히 (cheoncheonhi) = slowly. 천천히 말해 주세요 = Please speak slowly! 🐢"},
+      {q:"다시 means?", opts:["first time","never","again","always"], a:2, ml:421, topic:"TOPIK I · 부사", exp:"다시 (dasi) = again. 다시 한번 말해 주세요 = Please say it one more time! 🔁"},
+      {q:"전화번호 means?", opts:["email","address","phone number","name"], a:2, ml:351, topic:"TOPIK I · 일상표현", exp:"전화번호 (jeonhwabeonho) = phone number. 전화=phone, 번호=number. 📱"},
+      {q:"이름이 뭐예요?", opts:["How old?","What's your name?","Where from?","What time?"], a:1, ml:281, topic:"TOPIK I · 자기소개", exp:"이름이 뭐예요? = What is your name? 이름 = name. 제 이름은 ___이에요! 📛"},
+      {q:"몇 살이에요?", opts:["What's your name?","Where are you from?","How old are you?","What do you do?"], a:2, ml:281, topic:"TOPIK I · 자기소개", exp:"몇 살이에요? = How old are you? 살 = years old (uses native Korean numbers)! 🎂"},
+      {q:"어디에서 왔어요?", opts:["Where are you going?","Where are you from?","Where do you live?","Where do you work?"], a:1, ml:281, topic:"TOPIK I · 자기소개", exp:"어디에서 왔어요? = Where are you from? 에서=from, 왔어요=came! 🌍"},
+      // --- More Reading/Hangul Practice ---
+      {q:"다 = ?", opts:["da","ta","na","ra"], a:0, ml:1, topic:"TOPIK I · 읽기", exp:"ㄷ(d) + ㅏ(a) = 다 (da). 다 also means 'all' or is the dictionary ending of verbs! 📖"},
+      {q:"사 = ?", opts:["ja","sa","cha","ka"], a:1, ml:1, topic:"TOPIK I · 읽기", exp:"ㅅ(s) + ㅏ(a) = 사 (sa). 사 also means 'four' (Sino-Korean) and 'to buy'! 📖"},
+      {q:"고 = ?", opts:["go","ko","no","do"], a:0, ml:1, topic:"TOPIK I · 읽기", exp:"ㄱ(g) + ㅗ(o) = 고 (go). As a connector: -고 = 'and'. 먹고 = eat and... 📖"},
+      {q:"감사 = ?", opts:["gamsa","kamsa","gansa","kamsa"], a:0, ml:1, topic:"TOPIK I · 읽기", exp:"ㄱ+ㅏ+ㅁ = 감 (gam), ㅅ+ㅏ = 사 (sa). 감사 = gratitude/thanks! 🙏"},
+      {q:"친구 means?", opts:["family","teacher","friend","student"], a:2, ml:1, topic:"TOPIK I · 읽기", exp:"친구 (chingu) = friend. 친한 = close, 구 = companion. 친구랑 같이! 👫"},
+      {q:"약속 means?", opts:["medicine","promise/appointment","key","ticket"], a:1, ml:1, topic:"TOPIK I · 읽기", exp:"약속 (yaksok) = promise or appointment. 약속이 있어요 = I have an appointment! 📅"},
+      {q:"선물 means?", opts:["holiday","money","present/gift","card"], a:2, ml:1, topic:"TOPIK I · 읽기", exp:"선물 (seonmul) = present/gift. 생일 선물 = birthday present! 🎁"},
+      {q:"행복하다 means?", opts:["sad","angry","lonely","happy"], a:3, ml:161, topic:"TOPIK I · 형용사", exp:"행복하다 (haengbokhada) = happy. 행복해요! = I'm happy! 행복한 생일 = Happy birthday! 🥰"},
+    ],
+  },
+  intermediate: {
+    korean: [
+      {q:"-고 있다 expresses:", opts:["past","future","progressive","completion"], a:2, topic:"TOPIK II · 진행", exp:"-고 있다 = currently doing. 먹고 있어요 = I'm eating right now! 🔄"},
+      {q:"-고 connects like:", opts:["but","and","because","if"], a:1, topic:"TOPIK II · 연결어미", exp:"-고 = and (actions). 먹고 마셔요 = eat and drink! ➕"},
+      {q:"-서 means:", opts:["but","and then","because/so","if"], a:2, topic:"TOPIK II · 연결어미", exp:"-아/어서 = because/so. 배고파서 먹었어요 = Hungry so I ate! ∵"},
+      {q:"-지만 means:", opts:["and","but","because","if"], a:1, topic:"TOPIK II · 연결어미", exp:"-지만 = but. 비싸지만 맛있어요 = Expensive but delicious! ↔️"},
+      {q:"-(으)면 means:", opts:["and","but","because","if/when"], a:3, topic:"TOPIK II · 연결어미", exp:"-(으)면 = if/when. 비가 오면 = If it rains... 🔀"},
+      {q:"-기 때문에 means:", opts:["although","because","if","while"], a:1, topic:"TOPIK II · 연결어미", exp:"-기 때문에 = because (formal). 바쁘기 때문에 못 가요 = Can't go because busy! 📋"},
+      {q:"-는데 is used for:", opts:["commands","background/contrast","past tense","future"], a:1, topic:"TOPIK II · 연결어미", exp:"-는데 sets up background or soft contrast. Very versatile! 🌊"},
+      {q:"-(으)ㄹ 수 있다:", opts:["must","can/able to","want to","should"], a:1, topic:"TOPIK II · 가능", exp:"-(으)ㄹ 수 있다 = can. 한국어를 할 수 있어요 = I can speak Korean! 💪"},
+      {q:"-아/어도 되다:", opts:["must","may/allowed","want to","plan to"], a:1, topic:"TOPIK II · 허가", exp:"-아/어도 되다 = may. 앉아도 돼요? = May I sit? 🙋"},
+      {q:"-(으)면 안 되다:", opts:["may","must not","can","want to"], a:1, topic:"TOPIK II · 금지", exp:"-(으)면 안 되다 = must not. 여기서 담배를 피우면 안 돼요 = No smoking! 🚭"},
+      {q:"Honorific of 먹다:", opts:["먹어요","드세요/잡수세요","먹으세요","먹겠어요"], a:1, topic:"TOPIK II · 존댓말", exp:"먹다 → 드시다/잡수시다 for elders. Special honorific verbs! 🎩"},
+      {q:"Honorific of 자다:", opts:["자요","주무세요","잘 자요","자시다"], a:1, topic:"TOPIK II · 존댓말", exp:"자다 → 주무시다 for elders. 안녕히 주무세요 = Sleep well (to elder)! 🛏️"},
+      {q:"-(으)세요 is:", opts:["casual","polite request/honorific","written","past"], a:1, topic:"TOPIK II · 존댓말", exp:"-(으)세요 = please do / honorific. 앉으세요 = Please sit! 🙏"},
+      {q:"회사 means:", opts:["school","hospital","company","store"], a:2, topic:"TOPIK II · 직장", exp:"회사 = company. 회사원 = office worker. 🏢"},
+      {q:"여행 means:", opts:["work","study","travel","exercise"], a:2, topic:"TOPIK II · 여행", exp:"여행 = travel/trip. 여행 가고 싶어요! 🧳"},
+      {q:"건강 means:", opts:["money","health","weather","mood"], a:1, topic:"TOPIK II · 건강", exp:"건강 = health. 건강하세요! = Be healthy! 💪"},
+      {q:"문화 means:", opts:["question","culture","sentence","door"], a:1, topic:"TOPIK II · 사회", exp:"문화 = culture. 한국 문화 = Korean culture! 🎭"},
+      {q:"권 counts:", opts:["people","books/volumes","animals","bottles"], a:1, topic:"TOPIK II · 단위", exp:"권 = books/volumes. 책 세 권 = 3 books! 📚"},
+      {q:"병 counts:", opts:["cups","sheets","bottles","pieces"], a:2, topic:"TOPIK II · 단위", exp:"병 = bottles. 물 한 병 = 1 bottle of water! 🍾"},
+      {q:"번 counts:", opts:["sheets","times/number","bottles","floors"], a:1, topic:"TOPIK II · 단위", exp:"번 = times/number. 세 번 = 3 times. 🔢"},
+      {q:"-아/어 주다 means:", opts:["to try","to do for someone","to finish","to plan"], a:1, topic:"TOPIK II · 문법", exp:"-아/어 주다 = do for someone. 도와주세요 = Please help me! 🤝"},
+      {q:"-아/어 보다 means:", opts:["to see","to try doing","to finish","must do"], a:1, topic:"TOPIK II · 문법", exp:"-아/어 보다 = try doing. 먹어 봐요 = Try eating it! 🔍"},
+      {q:"-ㄴ/는 것 같다:", opts:["I know","I think/seems","I want","I must"], a:1, topic:"TOPIK II · 문법", exp:"-것 같다 = it seems/I think. 비가 올 것 같아요 = I think it'll rain! 🤔"},
+      {q:"-아/어야 하다:", opts:["can","want to","must/have to","try to"], a:2, topic:"TOPIK II · 의무", exp:"-아/어야 하다 = must. 공부해야 해요 = I must study! 📝"},
+      {q:"-지 마세요 means:", opts:["please do","please don't","please try","I hope"], a:1, topic:"TOPIK II · 금지", exp:"-지 마세요 = please don't. 걱정하지 마세요 = Don't worry! 🙅"},
+      {q:"-기로 하다 means:", opts:["to try","to decide to","to finish","to start"], a:1, topic:"TOPIK II · 결심", exp:"-기로 하다 = decide to. 한국어를 배우기로 했어요! 🎯"},
+      {q:"Formal ending -ㅂ니다:", opts:["casual","standard polite","formal polite","written"], a:2, topic:"TOPIK II · 격식체", exp:"-ㅂ니다/습니다 = formal polite. 감사합니다! Used in formal situations! 🎩"},
+      {q:"반말 is used with:", opts:["strangers","elders","close friends/younger","bosses"], a:2, topic:"TOPIK II · 격식", exp:"반말 = casual speech for close friends, younger people. 👫"},
+      {q:"Reported speech -다고:", opts:["I want","said that","I think","I hope"], a:1, topic:"TOPIK II · 간접화법", exp:"-다고 하다 = said that. 맛있다고 했어요 = Said it's delicious! 💬"},
+    ],
+  },
+  advanced: {
+    korean: [
+      {q:"-더라 expresses:", opts:["future plan","past recollection","present fact","wish"], a:1, topic:"TOPIK II · 고급 문법", exp:"-더라 = I recall/noticed that... Past observation: 맛있더라 = It was tasty! 🧠"},
+      {q:"-게 되다 means:", opts:["want to","come to/end up","have to","try to"], a:1, topic:"TOPIK II · 고급 문법", exp:"-게 되다 = come to/end up. 좋아하게 됐어요 = I came to like it! 🔄"},
+      {q:"-던 refers to:", opts:["future","habitual past/unfinished","present","command"], a:1, topic:"TOPIK II · 고급 문법", exp:"-던 = used to / was doing (unfinished). 먹던 음식 = food I was eating! ⏳"},
+      {q:"-(으)ㄹ 뻔하다:", opts:["will do","almost did","must do","want to"], a:1, topic:"TOPIK II · 고급 문법", exp:"-(으)ㄹ 뻔하다 = almost did. 넘어질 뻔했어요 = I almost fell! 😰"},
+      {q:"-는 바람에:", opts:["because (planned)","because (unexpected)","despite","although"], a:1, topic:"TOPIK II · 고급 문법", exp:"-는 바람에 = because (unexpected). 비가 오는 바람에 늦었어요! ⚡"},
+      {q:"-도록 expresses:", opts:["despite","so that/until","because","although"], a:1, topic:"TOPIK II · 고급 문법", exp:"-도록 = so that/until. 늦지 않도록 일찍 나왔어요! 🎯"},
+      {q:"눈이 높다:", opts:["eyes hurt","high standards","crying","tall"], a:1, topic:"TOPIK II · 관용어", exp:"눈이 높다 = high standards. 'Eyes are high' = picky! 👀"},
+      {q:"발이 넓다:", opts:["big feet","well-connected","runs fast","clumsy"], a:1, topic:"TOPIK II · 관용어", exp:"발이 넓다 = well-connected. 'Feet are wide' = knows many people! 🕸️"},
+      {q:"손이 크다:", opts:["strong hands","generous","clumsy","greedy"], a:1, topic:"TOPIK II · 관용어", exp:"손이 크다 = generous. 'Hands are big' = gives a lot! 🤲"},
+      {q:"귀가 얇다:", opts:["deaf","easily influenced","good hearing","shy"], a:1, topic:"TOPIK II · 관용어", exp:"귀가 얇다 = easily influenced. 'Ears are thin' = absorbs everything! 👂"},
+      {q:"콧대가 높다:", opts:["big nose","proud/arrogant","tall","snobby"], a:1, topic:"TOPIK II · 관용어", exp:"콧대가 높다 = proud/arrogant. 'Nose bridge is high'! 👃"},
+      {q:"입이 짧다:", opts:["quiet","picky eater","talkative","good cook"], a:1, topic:"TOPIK II · 관용어", exp:"입이 짧다 = picky eater. 'Mouth is short'! 🍽️"},
+      {q:"Reported question -냐고:", opts:["statement","question","command","wish"], a:1, topic:"TOPIK II · 간접화법", exp:"-냐고 = reported question. 어디 가냐고 물어봤어요 = Asked where going! ❓"},
+      {q:"불(不) as prefix means:", opts:["fire","un-/not","full","always"], a:1, topic:"TOPIK II · 한자어", exp:"불(不) = not/un-. 불가능=impossible, 불편하다=uncomfortable! 🚫"},
+      {q:"무(無) as prefix means:", opts:["very","without/none","always","new"], a:1, topic:"TOPIK II · 한자어", exp:"무(無) = without. 무료=free, 무한=infinite! 0️⃣"},
+      {q:"-는 셈이다:", opts:["trying to","it amounts to","must do","want to"], a:1, topic:"TOPIK II · 고급 문법", exp:"-는 셈이다 = it amounts to. 거의 다 한 셈이에요 = Practically done! 📊"},
+    ],
+  },
+  native: {
+    korean: [
+      {q:"표준어 means:", opts:["dialect","slang","standard Korean","written"], a:2, topic:"Native · 표준어", exp:"표준어 = standard language. Based on educated Seoul speech! 📺"},
+      {q:"사투리 means:", opts:["standard","regional dialect","formal","slang"], a:1, topic:"Native · 사투리", exp:"사투리 = dialect. 부산, 전라, 제주 each have distinct patterns! 🗣️"},
+      {q:"Formal written ending:", opts:["-요","-다","-ㅂ니다","-어"], a:1, topic:"Native · 문어체", exp:"-다 = written/diary form. 오늘 학교에 갔다 = I went to school (written). ✍️"},
+      {q:"-거야 vs -건데:", opts:["same","거야=statement, 건데=context","both formal","both casual"], a:1, topic:"Native · 뉘앙스", exp:"-거야 states a fact. -건데 adds 'but/you know' nuance. Subtle! 🎭"},
+      {q:"'다나까' is from:", opts:["Seoul","Busan","Jeju","Gangwon"], a:1, topic:"Native · 사투리", exp:"'-다나까' is Busan dialect. Known for strong, direct tone! 🌊"},
+      {q:"제주어 is:", opts:["Seoul dialect","nearly separate language","formal Korean","written style"], a:1, topic:"Native · 제주어", exp:"Jeju language is so different mainland Koreans often can't understand it! 🏝️"},
+      {q:"눈치 means:", opts:["eye color","social awareness","intelligence","mood"], a:1, topic:"Native · 문화", exp:"눈치 = social awareness/reading the room. Core Korean concept! 👀"},
+      {q:"정 means:", opts:["justice","deep affection/bond","money","family"], a:1, topic:"Native · 문화", exp:"정 = deep emotional bond. Uniquely Korean — bonds formed over time! ❤️"},
+      {q:"존칭 hierarchy:", opts:["age only","age→rank→closeness","alphabet","random"], a:1, topic:"Native · 존칭", exp:"Korean politeness: age first, then social position, then closeness. 📊"},
+      {q:"까다롭다 vs 엄격하다:", opts:["same","picky vs strict","both strict","both picky"], a:1, topic:"Native · 어휘", exp:"까다롭다=picky (personality), 엄격하다=strict (rules). Subtle difference! 🔍"},
+      {q:"찐 vs 진짜:", opts:["same register","찐=slang, 진짜=standard","both formal","both slang"], a:1, topic:"Native · 신조어", exp:"찐 is trendy slang for 'real/genuine' (from 진짜). Gen Z Korean! 🔥"},
+      {q:"TMI in Korean:", opts:["too much info (same)","very important","formal","texting only"], a:0, topic:"Native · 신조어", exp:"TMI is used in Korean exactly like English! Konglish adoption. 📱"},
+    ],
+  },
+};
+function getQuestionPool(lvl, subj) {
+  // Tag each question with a stable _id so we can track history across rounds/levels.
+  const tag = (arr, src) => arr.map((q, i) => ({...q, _id: `${src}_${i}`, _src: src}));
+  if (subj === 'mixed') {
+    const l = Q[lvl];
+    return [...tag(l.math||[], 'math'), ...tag(l.english||[], 'english'), ...tag(l.chinese||[], 'chinese')];
+  }
+  if (!Q[lvl] || !Q[lvl][subj]) return [];
+  return tag(Q[lvl][subj], subj);
+}
+function getSubjectLabel(s) {
+  return {math:'Math', english:'English', chinese:'华文', mixed:'Mixed', korean:'Korean 🇰🇷'}[s] || s;
+}
+
+// ============== TOWERS (10 upgrade levels each, procedurally generated) ==============
+function lerpHex(a, b, t) {
+  const pa = [parseInt(a.slice(1,3),16), parseInt(a.slice(3,5),16), parseInt(a.slice(5,7),16)];
+  const pb = [parseInt(b.slice(1,3),16), parseInt(b.slice(3,5),16), parseInt(b.slice(5,7),16)];
+  const r = Math.round(pa[0]+(pb[0]-pa[0])*t), g = Math.round(pa[1]+(pb[1]-pa[1])*t), bl = Math.round(pa[2]+(pb[2]-pa[2])*t);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${bl.toString(16).padStart(2,'0')}`;
+}
+
+// Tower definitions: base → max stats interpolated across 10 levels
+const TOWER_DEFS = {
+  bunny: {
+    name:'Police Bunny', emoji:'🐰',
+    costs:[30, 20, 22, 25, 30, 35, 42, 50, 65, 80],
+    range:[1.7, 3.0], dmg:[1, 8], fireRate:[700, 350],
+    colors:['#FFB8D1','#FF4A8D'], ringColor:'#E6739D',
+  },
+  bear: {
+    name:'Firefighter Bear', emoji:'🐻',
+    costs:[40, 25, 28, 32, 38, 45, 55, 65, 80, 100],
+    range:[2.0, 3.5], dmg:[1, 10], fireRate:[900, 450],
+    colors:['#F5C795','#D4782E'], ringColor:'#B8833B',
+  },
+  police: {
+    name:'Police Car', emoji:'🚓',
+    costs:[35, 22, 25, 28, 34, 40, 48, 58, 72, 90],
+    range:[1.6, 2.8], dmg:[1, 6], fireRate:[500, 200],
+    colors:['#A0D8F0','#2196F3'], ringColor:'#1976D2',
+  },
+  redcar: {
+    name:'Red Racer', emoji:'🚗',
+    costs:[25, 18, 20, 22, 26, 32, 38, 45, 55, 70],
+    range:[1.4, 2.4], dmg:[1, 5], fireRate:[400, 180],
+    colors:['#FFB8A0','#E53935'], ringColor:'#C62828',
+  },
+  princess: {
+    name:'Princess', emoji:'👸',
+    costs:[45, 28, 30, 35, 40, 48, 56, 68, 82, 105],
+    range:[2.2, 3.4], dmg:[1, 9], fireRate:[800, 380],
+    colors:['#FFD6E8','#E91E90'], ringColor:'#C2185B',
+  },
+  panda: {
+    name:'Panda Scholar', emoji:'🐼',
+    costs:[40, 25, 28, 32, 38, 48, 58, 70, 85, 110],
+    range:[1.9, 3.2], dmg:[2, 15], fireRate:[1100, 500],
+    colors:['#E5E5E5','#888888'], ringColor:'#666',
+  },
+  unicorn: {
+    name:'Magic Unicorn', emoji:'🦄',
+    costs:[75, 40, 45, 50, 60, 72, 85, 100, 120, 150],
+    range:[2.8, 4.5], dmg:[3, 18], fireRate:[1200, 600],
+    colors:['#E8D5F5','#7B1FA2'], ringColor:'#6A1B9A',
+  },
+  owl: {
+    name:'Math Owl', emoji:'🦉',
+    costs:[60, 35, 38, 42, 50, 60, 72, 85, 100, 130],
+    range:[2.5, 4.0], dmg:[2, 12], fireRate:[900, 400],
+    colors:['#C7B8EA','#6B3FA0'], ringColor:'#6B4FA0',
+  },
+};
+
+function buildTowerLevels(def) {
+  const levels = [];
+  for (let i = 0; i < 10; i++) {
+    const t = i / 9;
+    levels.push({
+      emoji: def.emoji,
+      cost: def.costs[i],
+      range: +(def.range[0] + (def.range[1] - def.range[0]) * t).toFixed(1),
+      dmg: Math.max(1, Math.round(def.dmg[0] + (def.dmg[1] - def.dmg[0]) * t)),
+      fireRate: Math.round(def.fireRate[0] + (def.fireRate[1] - def.fireRate[0]) * t),
+      color: lerpHex(def.colors[0], def.colors[1], t),
+      ring: i >= 3 ? (i >= 7 ? '#FFD700' : def.ringColor) : null,
+      crown: i === 9,
+    });
+  }
+  return levels;
+}
+
+const TOWERS = {};
+for (const [key, def] of Object.entries(TOWER_DEFS)) {
+  TOWERS[key] = { name: def.name, levels: buildTowerLevels(def) };
+}
+
+function towerSpec(type, level=0) { return TOWERS[type].levels[Math.min(level, TOWERS[type].levels.length-1)]; }
+
+// ============== ENEMY TYPES (cute monsters) ==============
+const ENEMY_TYPES = [
+  {emoji:'🧌', hp:2, speed:48, name:'Troll'},         // 0 - basic, plodding
+  {emoji:'👺', hp:3, speed:68, name:'Goblin'},         // 1 - fast red-nose
+  {emoji:'🕷️', hp:6, speed:32, name:'Spider'},        // 2 - tough, slow
+  {emoji:'🦇', hp:2, speed:82, name:'Bat'},            // 3 - fastest, low HP
+  {emoji:'👻', hp:4, speed:54, name:'Ghostie'},        // 4 - medium all-round
+  {emoji:'💀', hp:8, speed:40, name:'Skelly'},         // 5 - tough
+];
+// Boss enemy types (bigger HP, per-level)
+const BOSS_TYPES = [
+  {emoji:'🐲', hp:30, speed:36, name:'Dragon'},
+  {emoji:'👹', hp:40, speed:32, name:'Giant Ogre'},
+  {emoji:'🧟', hp:25, speed:58, name:'Zombie King'},
+  {emoji:'🧛', hp:50, speed:30, name:'Vampire Lord'},
+  {emoji:'🦖', hp:60, speed:34, name:'T-Rex'},
+];
+
+// ============== GRID & PATH SYSTEM ==============
+const GRID_COLS = 7;
+const GRID_ROWS = 8;
+
+// 5 path shape variants for normal rounds
+const PATH_VARIANTS = [
+  // 0: Classic zigzag (top→bottom, 4 rows)
+  [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[6,1],[6,2],[5,2],[4,2],[3,2],[2,2],[1,2],[0,2],[0,3],[0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[6,5],[6,6],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7]],
+  // 1: S-curve
+  [[0,0],[1,0],[2,0],[3,0],[3,1],[3,2],[3,3],[2,3],[1,3],[0,3],[0,4],[0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[6,6],[6,7]],
+  // 2: Spiral-ish
+  [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[6,1],[6,2],[6,3],[6,4],[5,4],[4,4],[3,4],[2,4],[1,4],[1,5],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[6,7]],
+  // 3: Short across
+  [[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[6,2],[6,3],[5,3],[4,3],[3,3],[2,3],[1,3],[0,3],[0,4],[0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[6,6],[6,7]],
+  // 4: W-shape
+  [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[6,1],[6,2],[6,3],[5,3],[4,3],[3,3],[3,4],[3,5],[4,5],[5,5],[6,5],[6,6],[6,7]],
+];
+
+// ============== LEVEL SPEC GENERATOR ==============
+// Determines what "level N" looks like: path, waves, starting coins, boss or not.
+// Design: within a level, all rounds share the same map. The player adds more
+// towers between rounds. Maps also repeat across 3 consecutive levels so the
+// player masters a layout before a new one appears.
+function getLevelSpec(n) {
+  const isBoss = n % 10 === 0;
+  if (isBoss) {
+    // Boss round: blank map, user builds maze — single big wave
+    return {
+      n, isBoss: true,
+      variant: -1,
+      entry: {col:0, row:0},
+      exit: {col:6, row:7},
+      waves: generateBossWaves(n),
+      startCoins: Math.min(280, 110 + Math.floor(n/10) * 25),
+      lives: 5,
+      questionsPerWave: [Math.min(5, 3 + Math.floor(n/50))],
+    };
+  }
+  // Map variant stays the same for 3 consecutive levels (map mastery).
+  // Skip the boss slot when cycling so the pattern stays clean.
+  const normalIdx = n - Math.floor(n / 10);
+  const variantIdx = Math.floor((normalIdx - 1) / 3) % PATH_VARIANTS.length;
+  const waves = generateWaves(n);
+  const isK2 = state.level === 'K2';
+  const tuning = getModeTuning();
+  const baseCoins = isK2 ? Math.min(280, 120 + Math.floor(n/3) * 5)
+                         : Math.min(220, 90 + Math.floor(n/4) * 4);
+  return {
+    n, isBoss: false,
+    variant: variantIdx,
+    path: PATH_VARIANTS[variantIdx],
+    waves,
+    startCoins: Math.round(baseCoins * tuning.startCoinsMul),
+    lives: isK2 ? 7 : (tuning.lives || 5),
+    questionsPerWave: waves.map((_, i) => {
+      const isLast = i === waves.length - 1;
+      if (isK2) return isLast ? 2 : 1;
+      const base = Math.min(2, 1 + Math.floor(n / 30)) + tuning.questionsExtra;
+      return isLast ? Math.min(5, base + 1) : base;
+    }),
+  };
+}
+
+function generateWaves(n) {
+  // Every normal level has 8 rounds on the same map.
+  const numWaves = 8;
+  const hpBoost = Math.min(50, Math.floor(n / 8));
+  const isK2 = state.level === 'K2';
+  const waves = [];
+  for (let w = 0; w < numWaves; w++) {
+    // K2: fewer enemies, gentler scaling, slower spawn
+    const baseCount = isK2 ? (2 + Math.floor(n / 25) + Math.floor(w * 0.6))
+                           : (3 + Math.floor(n / 15) + w);
+    const count = Math.min(isK2 ? 12 : 22, baseCount);
+    let pool = [0, 3]; // troll, bat
+    if (n >= 2 || w >= 2) pool.push(1);   // goblin
+    if (n >= 5 || w >= 3) pool.push(4);   // ghostie
+    if (!isK2 && (n >= 10 || w >= 5)) pool.push(2);  // spider
+    if (!isK2 && (n >= 15 || w >= 7)) pool.push(5);  // skelly
+    const enemies = [];
+    for (let i = 0; i < count; i++) {
+      enemies.push({
+        type: pool[Math.floor(Math.random() * pool.length)],
+        delay: Math.max(380, (isK2 ? 1100 : 850) + Math.random() * 350 - Math.min(400, n * 3)),
+        hpBoost: isK2 ? Math.floor(hpBoost * 0.5 + w * 0.5) : (hpBoost + Math.floor(w * 1.5)),
+      });
+    }
+    waves.push({ enemies });
+  }
+  return waves;
+}
+
+function generateBossWaves(n) {
+  const bossIdx = Math.min(BOSS_TYPES.length - 1, Math.floor(n / 10) - 1);
+  const bossHpBoost = Math.floor(n / 10) * 8;
+  const minionCount = 6 + Math.floor(n / 10);
+  const minions = [];
+  for (let i = 0; i < minionCount; i++) {
+    minions.push({ type: [0,3,4][i%3], delay: 700, hpBoost: Math.floor(n/8), boss:false });
+  }
+  const bossEnemy = { boss: true, bossIdx, delay: 1500, hpBoost: bossHpBoost };
+  return [{ enemies: [...minions, bossEnemy] }];
+}
+
+// ============== PATHFINDING (for boss rounds) ==============
+function bfsPath(start, end, isBlocked) {
+  const key = (c, r) => `${c},${r}`;
+  const q = [{col:start.col, row:start.row}];
+  const parent = new Map();
+  parent.set(key(start.col, start.row), null);
+  while (q.length) {
+    const cur = q.shift();
+    if (cur.col === end.col && cur.row === end.row) {
+      // reconstruct
+      const out = [];
+      let k = key(cur.col, cur.row);
+      while (k) {
+        const [c, r] = k.split(',').map(Number);
+        out.unshift({col:c, row:r});
+        k = parent.get(k);
+      }
+      return out;
+    }
+    for (const [dc, dr] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nc = cur.col + dc, nr = cur.row + dr;
+      if (nc<0 || nc>=GRID_COLS || nr<0 || nr>=GRID_ROWS) continue;
+      const nk = key(nc, nr);
+      if (parent.has(nk)) continue;
+      if (isBlocked(nc, nr)) continue;
+      parent.set(nk, key(cur.col, cur.row));
+      q.push({col:nc, row:nr});
+    }
+  }
+  return null;
+}
+
+// ============== PROGRESS (localStorage for persistence) ==============
+const progress = {
+  data: null,
+  _loaded: false,
+  async load() {
+    if (this._loaded) return;
+    this._loaded = true;
+    this.data = this._default();
+    try {
+      const raw = localStorage.getItem('kd_progress_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        this.data = {...this._default(), ...parsed};
+      }
+    } catch(e) {}
+  },
+  async save() {
+    try {
+      localStorage.setItem('kd_progress_v1', JSON.stringify(this.data));
+    } catch(e) {}
+  },
+  key(lvl, subj) { return `${state.mode}_${lvl}_${subj}`; },
+  getUnlocked(lvl, subj) { return (this.data && this.data[this.key(lvl,subj)]?.unlocked) || 1; },
+  getStars(lvl, subj, n) { return (this.data && this.data[this.key(lvl,subj)]?.stars?.[n]) || 0; },
+  async complete(lvl, subj, n, stars) {
+    const k = this.key(lvl, subj);
+    if (!this.data[k]) this.data[k] = { unlocked: 1, stars: {} };
+    const bucket = this.data[k];
+    bucket.unlocked = Math.max(bucket.unlocked, n + 1);
+    bucket.stars[n] = Math.max(bucket.stars[n] || 0, stars);
+    await this.save();
+  },
+
+  // Question history per grade level (P1/P2/P3). Mixed mode questions are
+  // tagged with their source subject so history is shared between single-subject
+  // and mixed modes — a math question seen in Mixed won't reappear in Math, etc.
+  historyKey(lvl) { return `hist_${lvl}`; },
+  getHistory(lvl) {
+    const k = this.historyKey(lvl);
+    if (!this.data[k]) this.data[k] = { seen: [], mistakes: [] };
+    return this.data[k];
+  },
+  isMistake(lvl, qId) {
+    return this.getHistory(lvl).mistakes.includes(qId);
+  },
+  recordAnswer(lvl, qId, correct) {
+    const h = this.getHistory(lvl);
+    if (!h.seen.includes(qId)) h.seen.push(qId);
+    if (correct) {
+      h.mistakes = h.mistakes.filter(id => id !== qId);
+    } else {
+      if (!h.mistakes.includes(qId)) h.mistakes.push(qId);
+    }
+    this.save();   // fire-and-forget
+  },
+
+  _default() { return {}; },
+};
+
+// Smart quiz question picker: prefers mistakes (for review), then unseen,
+// then falls back to mastered questions only if pool is exhausted.
+function pickQuestionsForQuiz(lvl, subj, count) {
+  let pool = getQuestionPool(lvl, subj);
+  // Staged curriculum: filter by minLevel if questions have ml tags.
+  // Only show questions the player has "unlocked" based on their current level.
+  const currentLevel = state.levelNum || 1;
+  pool = pool.filter(q => !q.ml || q.ml <= currentLevel);
+
+  const h = progress.getHistory(lvl);
+  const seenSet = new Set(h.seen);
+  const mistakesSet = new Set(h.mistakes);
+
+  const mistakes = [], unseen = [], mastered = [];
+  for (const q of pool) {
+    if (mistakesSet.has(q._id)) mistakes.push(q);
+    else if (seenSet.has(q._id)) mastered.push(q);
+    else unseen.push(q);
+  }
+  const shuffle = arr => { const a = [...arr]; for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+
+  const picked = [];
+  // Up to half the quiz slots can be review (mistake) questions
+  const maxMistakes = Math.ceil(count / 2);
+  picked.push(...shuffle(mistakes).slice(0, Math.min(maxMistakes, mistakes.length)));
+
+  // Fill remaining slots with fresh, unseen questions
+  const needMore = count - picked.length;
+  if (needMore > 0) picked.push(...shuffle(unseen).slice(0, needMore));
+
+  // Still need more? Use extra mistakes (beyond the half-cap)
+  const extraMistakesAvailable = mistakes.filter(m => !picked.includes(m));
+  const stillNeed1 = count - picked.length;
+  if (stillNeed1 > 0) picked.push(...shuffle(extraMistakesAvailable).slice(0, stillNeed1));
+
+  // Last resort: mastered questions (only when the pool is truly exhausted)
+  const stillNeed2 = count - picked.length;
+  if (stillNeed2 > 0) picked.push(...shuffle(mastered).slice(0, stillNeed2));
+
+  return shuffle(picked);
+}
+
+// ============== STATE ==============
+const state = {
+  // Selection
+  mode: 'kids',      // kids | adults
+  level: 'P1',
+  subject: 'mixed',
+  levelNum: 1,
+  spec: null,
+  // Runtime
+  screen: 'start',    // start | journey | play
+  phase: 'menu',      // menu | prep | wave | quiz | summary | end
+  lives: 5,
+  coins: 60,
+  enemies: [],
+  towers: [],
+  projectiles: [],
+  sparkles: [],
+  spawnQueue: [],
+  spawnTimer: 0,
+  currentWaveIdx: 0,  // index in spec.waves
+  selectedTowerType: null,
+  bossPath: null,     // For boss rounds: computed path
+  running: false,
+  // Canvas
+  canvasW: 0, canvasH: 0,
+  gridOffX: 0, gridOffY: 0, tileSize: 48,
+  // Quiz
+  quizQuestions: [], quizIndex: 0, quizCorrect: 0, quizResults: [],
+  totalCorrect: 0, totalAnswered: 0,
+};
+
+// ============== CANVAS ==============
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let flowerCache = null, _flowerSize = 0;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  state.canvasW = w; state.canvasH = h;
+  computeGrid();
+  flowerCache = null;
+}
+window.addEventListener('resize', resize);
+
+function computeGrid() {
+  const availW = state.canvasW - 16;
+  const availH = state.canvasH - 70 - 80 - 20;
+  state.tileSize = Math.floor(Math.min(availW / GRID_COLS, availH / GRID_ROWS));
+  const gW = state.tileSize * GRID_COLS;
+  state.gridOffX = Math.round((state.canvasW - gW) / 2);
+  state.gridOffY = 72;
+}
+function cellCenter(c, r) { return { x: state.gridOffX + c*state.tileSize + state.tileSize/2, y: state.gridOffY + r*state.tileSize + state.tileSize/2 }; }
+function cellRect(c, r) { return { x: state.gridOffX + c*state.tileSize, y: state.gridOffY + r*state.tileSize, w: state.tileSize, h: state.tileSize }; }
+function pxToCell(px, py) {
+  const c = Math.floor((px - state.gridOffX) / state.tileSize);
+  const r = Math.floor((py - state.gridOffY) / state.tileSize);
+  if (c<0||c>=GRID_COLS||r<0||r>=GRID_ROWS) return null;
+  return {col:c, row:r};
+}
+function towerAt(c, r) { return state.towers.find(t => t.col===c && t.row===r); }
+
+// Path points (for normal levels OR boss round)
+function getPathCells() {
+  if (state.spec?.isBoss) return state.bossPath || [state.spec.entry, state.spec.exit];
+  return state.spec?.path || [];
+}
+function isPathCell(c, r) {
+  if (state.spec?.isBoss) {
+    // For boss: entry/exit are "path" cells (can't place tower there)
+    const s = state.spec;
+    if (c === s.entry.col && r === s.entry.row) return true;
+    if (c === s.exit.col && r === s.exit.row) return true;
+    return false;
+  }
+  const cells = state.spec?.path || [];
+  return cells.some(([cc, rr]) => cc === c && rr === r);
+}
+
+function getPathPoints() {
+  const cells = getPathCells().map(cell => {
+    if (Array.isArray(cell)) return cellCenter(cell[0], cell[1]);
+    return cellCenter(cell.col, cell.row);
+  });
+  if (cells.length < 2) return cells;
+  const ts = state.tileSize;
+  // extend start off-left
+  const first = cells[0], second = cells[1];
+  const dx = first.x - second.x, dy = first.y - second.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const startExt = { x: first.x + (dx/len) * ts * 1.2, y: first.y + (dy/len) * ts * 1.2 };
+  // extend end off-screen
+  const last = cells[cells.length-1], prev = cells[cells.length-2];
+  const dx2 = last.x - prev.x, dy2 = last.y - prev.y;
+  const len2 = Math.hypot(dx2, dy2) || 1;
+  const endExt = { x: last.x + (dx2/len2) * ts * 1.2, y: last.y + (dy2/len2) * ts * 1.2 };
+  return [startExt, ...cells, endExt];
+}
+
+// ============== ENEMIES ==============
+function spawnEnemy(spec) {
+  let type, isBoss = false;
+  if (spec.boss) {
+    type = BOSS_TYPES[spec.bossIdx];
+    isBoss = true;
+  } else {
+    type = ENEMY_TYPES[spec.type];
+  }
+  const pp = getPathPoints();
+  state.enemies.push({
+    type, hp: type.hp + spec.hpBoost, maxHp: type.hp + spec.hpBoost,
+    speed: type.speed, segment: 0, t: 0,
+    x: pp[0].x, y: pp[0].y, wobble: Math.random() * Math.PI * 2,
+    boss: isBoss,
+  });
+}
+
+function updateEnemies(dt) {
+  const pp = getPathPoints();
+  for (let i = state.enemies.length - 1; i >= 0; i--) {
+    const e = state.enemies[i];
+    e.wobble += dt * 6;
+    const a = pp[e.segment];
+    const b = pp[e.segment + 1];
+    if (!b) {
+      const damage = e.boss ? 3 : 1;
+      state.lives = Math.max(0, state.lives - damage);
+      state.enemies.splice(i, 1);
+      updateHUD();
+      flashHeart();
+      audio.play('heartlost');
+      if (state.lives <= 0) { gameOver(false); return; }
+      continue;
+    }
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    e.t += (e.speed * dt) / segLen;
+    while (e.t >= 1 && e.segment < pp.length - 1) { e.t -= 1; e.segment++; }
+    const aa = pp[e.segment] || a, bb = pp[e.segment + 1] || b;
+    const tt = Math.max(0, Math.min(1, e.t));
+    e.x = aa.x + (bb.x - aa.x) * tt;
+    e.y = aa.y + (bb.y - aa.y) * tt;
+  }
+}
+
+// ============== TOWERS ==============
+function placeTower(col, row, type) {
+  const c = cellCenter(col, row);
+  state.towers.push({ type, level: 0, col, row, x: c.x, y: c.y, cooldown: 0 });
+}
+
+function updateTowers(dt) {
+  for (const t of state.towers) {
+    const spec = towerSpec(t.type, t.level);
+    t.cooldown -= dt * 1000;
+    if (t.cooldown > 0) continue;
+    const rangePx = spec.range * state.tileSize;
+    let target = null, best = Infinity;
+    for (const e of state.enemies) {
+      const d = Math.hypot(e.x - t.x, e.y - t.y);
+      if (d < rangePx && d < best) { best = d; target = e; }
+    }
+    if (target) {
+      state.projectiles.push({ x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color });
+      t.cooldown = spec.fireRate;
+      audio.play('shoot');
+    }
+  }
+}
+
+// ============== PROJECTILES ==============
+function updateProjectiles(dt) {
+  for (let i = state.projectiles.length - 1; i >= 0; i--) {
+    const p = state.projectiles[i];
+    p.t += dt * 5;
+    if (p.t >= 1 || !p.target || !state.enemies.includes(p.target)) {
+      if (p.target && state.enemies.includes(p.target)) {
+        p.target.hp -= p.dmg;
+        spawnSparkles(p.target.x, p.target.y, p.color, 6);
+        if (p.target.hp <= 0) {
+          audio.play('defeat');
+          spawnSparkles(p.target.x, p.target.y, '#FFD66B', p.target.boss ? 28 : 14);
+          state.enemies.splice(state.enemies.indexOf(p.target), 1);
+        } else {
+          audio.play('hit');
+        }
+      }
+      state.projectiles.splice(i, 1);
+    }
+  }
+}
+
+function spawnSparkles(x, y, color, count=6) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 50 + Math.random() * 90;
+    state.sparkles.push({
+      x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd - 30,
+      life: 0.6 + Math.random()*0.3, max: 0.9, color, size: 3 + Math.random()*3,
+    });
+  }
+}
+function updateSparkles(dt) {
+  for (let i = state.sparkles.length - 1; i >= 0; i--) {
+    const s = state.sparkles[i];
+    s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 80 * dt;
+    s.life -= dt;
+    if (s.life <= 0) state.sparkles.splice(i, 1);
+  }
+}
+
+// ============== DRAW ==============
+function draw() {
+  const W = state.canvasW, H = state.canvasH;
+  ctx.clearRect(0, 0, W, H);
+  const g = ctx.createLinearGradient(0, 60, 0, H - 80);
+  g.addColorStop(0, '#EEF7E5'); g.addColorStop(1, '#D8EDDC');
+  ctx.fillStyle = g; ctx.fillRect(0, 60, W, H - 140);
+
+  drawGrid();
+  drawFlowers();
+  drawPath();
+  drawBase();
+  if (state.selectedTowerType && state.phase === 'prep') drawPlacementHints();
+  for (const t of state.towers) drawTower(t);
+  for (const e of state.enemies) drawEnemy(e);
+  for (const p of state.projectiles) drawProjectile(p);
+  for (const s of state.sparkles) drawSparkle(s);
+}
+
+function drawGrid() {
+  const ts = state.tileSize;
+  for (let r = 0; r < GRID_ROWS; r++) {
+    for (let c = 0; c < GRID_COLS; c++) {
+      if (isPathCell(c, r)) continue;
+      const rect = cellRect(c, r);
+      ctx.fillStyle = ((c + r) % 2 === 0) ? '#C8E6B8' : '#BDDFAD';
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+  }
+  ctx.strokeStyle = 'rgba(61,46,63,0.1)'; ctx.lineWidth = 1;
+  for (let r = 0; r <= GRID_ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(state.gridOffX, state.gridOffY + r * ts);
+    ctx.lineTo(state.gridOffX + GRID_COLS * ts, state.gridOffY + r * ts);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= GRID_COLS; c++) {
+    ctx.beginPath();
+    ctx.moveTo(state.gridOffX + c * ts, state.gridOffY);
+    ctx.lineTo(state.gridOffX + c * ts, state.gridOffY + GRID_ROWS * ts);
+    ctx.stroke();
+  }
+}
+
+function drawPlacementHints() {
+  const spec = towerSpec(state.selectedTowerType, 0);
+  const canAfford = state.coins >= spec.cost;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+  for (let r = 0; r < GRID_ROWS; r++) {
+    for (let c = 0; c < GRID_COLS; c++) {
+      if (isPathCell(c, r)) continue;
+      if (towerAt(c, r)) continue;
+      // For boss: check if placement would block
+      if (state.spec?.isBoss && !canPlaceInBoss(c, r)) continue;
+      const rect = cellRect(c, r);
+      if (canAfford) {
+        ctx.fillStyle = `rgba(255, 214, 107, ${0.15 + 0.25 * pulse})`;
+        ctx.fillRect(rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4);
+        ctx.strokeStyle = `rgba(255, 180, 50, ${0.4 + 0.5 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4);
+      }
+    }
+  }
+}
+
+function drawFlowers() {
+  if (!flowerCache || _flowerSize !== state.tileSize) {
+    flowerCache = []; _flowerSize = state.tileSize;
+    const emojis = ['🌸','🌼','🌻','🍀','🌷','🌺'];
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        if (isPathCell(c, r)) continue;
+        if (Math.random() < 0.24) {
+          const rect = cellRect(c, r);
+          flowerCache.push({
+            col: c, row: r,
+            x: rect.x + rect.w / 2 + (Math.random() - 0.5) * rect.w * 0.3,
+            y: rect.y + rect.h / 2 + (Math.random() - 0.5) * rect.h * 0.3,
+            e: emojis[Math.floor(Math.random() * emojis.length)],
+            s: Math.max(12, state.tileSize * 0.32),
+          });
+        }
+      }
+    }
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of flowerCache) {
+    if (towerAt(f.col, f.row)) continue;
+    ctx.font = `${f.s}px serif`;
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(f.e, f.x, f.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPath() {
+  const pp = getPathPoints();
+  if (pp.length < 2) return;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const pathW = state.tileSize * 0.82;
+  ctx.strokeStyle = '#8B6F47'; ctx.lineWidth = pathW + 6;
+  ctx.beginPath(); ctx.moveTo(pp[0].x, pp[0].y);
+  for (let i = 1; i < pp.length; i++) ctx.lineTo(pp[i].x, pp[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = '#F4D9A6'; ctx.lineWidth = pathW; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
+  ctx.setLineDash([10, 9]);
+  ctx.beginPath(); ctx.moveTo(pp[0].x, pp[0].y);
+  for (let i = 1; i < pp.length; i++) ctx.lineTo(pp[i].x, pp[i].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBase() {
+  const cells = state.spec?.isBoss
+    ? { first: state.spec.entry, last: state.spec.exit }
+    : { first: {col: state.spec.path[0][0], row: state.spec.path[0][1]},
+        last: {col: state.spec.path[state.spec.path.length-1][0], row: state.spec.path[state.spec.path.length-1][1]} };
+  const lastC = cellCenter(cells.last.col, cells.last.row);
+  drawEmojiCircle(lastC.x, lastC.y, state.tileSize * 0.38, '#FFF4D4', '🏫');
+  const firstC = cellCenter(cells.first.col, cells.first.row);
+  ctx.font = `${Math.round(state.tileSize * 0.5)}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const ax = firstC.x - (state.spec?.isBoss ? 0 : state.tileSize * 0.7);
+  const ay = firstC.y - (state.spec?.isBoss ? state.tileSize * 0.7 : 0);
+  ctx.fillText('➡️', ax, ay);
+}
+
+function drawTower(t) {
+  const spec = towerSpec(t.type, t.level);
+  const r = state.tileSize * 0.35;
+  if (state.phase === 'prep') {
+    ctx.beginPath(); ctx.arc(t.x, t.y, spec.range * state.tileSize, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(61,46,63,0.14)'; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Upgrade ring (visible from L4+, gold from L8+)
+  if (spec.ring) {
+    ctx.beginPath(); ctx.arc(t.x, t.y, r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = spec.ring; ctx.lineWidth = 3; ctx.stroke();
+  }
+  drawEmojiCircle(t.x, t.y, r, spec.color, spec.emoji);
+  // Crown for max level (L10)
+  if (spec.crown) {
+    ctx.font = `${Math.round(r * 0.75)}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('👑', t.x, t.y - r - 2);
+  }
+  // Level badge — small number below the tower
+  if (t.level > 0) {
+    const fs = Math.max(9, Math.round(state.tileSize * 0.2));
+    ctx.font = `bold ${fs}px Fredoka, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = spec.ring || '#6B4FA0';
+    ctx.fillText(`Lv${t.level + 1}`, t.x, t.y + r + 2);
+  }
+}
+
+function drawEnemy(e) {
+  const bob = Math.sin(e.wobble) * 2;
+  const r = state.tileSize * (e.boss ? 0.42 : 0.28);
+  drawEmojiCircle(e.x, e.y + bob, r, e.boss ? '#FFD6D6' : 'white', e.type.emoji);
+  if (e.hp < e.maxHp) {
+    const w = r * 2;
+    ctx.fillStyle = '#FFF';
+    ctx.fillRect(e.x - w/2, e.y - r - 10, w, 5);
+    ctx.fillStyle = e.boss ? '#D14D6A' : '#4ABE86';
+    ctx.fillRect(e.x - w/2, e.y - r - 10, w * (e.hp/e.maxHp), 5);
+    ctx.strokeStyle = 'rgba(61,46,63,0.6)'; ctx.lineWidth = 1;
+    ctx.strokeRect(e.x - w/2, e.y - r - 10, w, 5);
+  }
+}
+
+function drawEmojiCircle(x, y, r, bg, emoji) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = '#3D2E3F'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.font = `${Math.round(r * 1.3)}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, x, y + 1);
+}
+
+function drawProjectile(p) {
+  const tx = p.target ? p.target.x : p.x, ty = p.target ? p.target.y : p.y;
+  const x = p.x + (tx - p.x) * p.t, y = p.y + (ty - p.y) * p.t;
+  for (let i = 0; i < 3; i++) {
+    const tt = Math.max(0, p.t - i * 0.08);
+    const px = p.x + (tx - p.x) * tt, py = p.y + (ty - p.y) * tt;
+    ctx.beginPath(); ctx.arc(px, py, 5 - i * 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.globalAlpha = 1 - i * 0.3; ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = p.color; ctx.fill();
+  ctx.strokeStyle = '#3D2E3F'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawSparkle(s) {
+  const alpha = Math.max(0, s.life / s.max);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = s.color;
+  ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// ============== BOSS MAZE VALIDATION ==============
+function canPlaceInBoss(col, row) {
+  if (!state.spec?.isBoss) return true;
+  const s = state.spec;
+  if (col === s.entry.col && row === s.entry.row) return false;
+  if (col === s.exit.col && row === s.exit.row) return false;
+  const blocked = (c, r) => {
+    if (c === col && r === row) return true;
+    return !!towerAt(c, r);
+  };
+  const path = bfsPath(s.entry, s.exit, blocked);
+  return path !== null;
+}
+
+function recomputeBossPath() {
+  if (!state.spec?.isBoss) return;
+  const s = state.spec;
+  const blocked = (c, r) => !!towerAt(c, r);
+  const p = bfsPath(s.entry, s.exit, blocked);
+  state.bossPath = p || [s.entry, s.exit];
+}
+
+// ============== INTERACTION ==============
+function onCanvasPointer(e) {
+  if (state.phase !== 'prep' && state.phase !== 'wave') return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  const cell = pxToCell(cx, cy);
+  if (!cell) return;
+
+  // Check if tapping an existing tower → open upgrade popup (during prep only)
+  const existing = towerAt(cell.col, cell.row);
+  if (existing && state.phase === 'prep') {
+    audio.play('click');
+    openTowerPopup(existing);
+    return;
+  }
+
+  // Place new tower (prep only)
+  if (state.phase !== 'prep') return;
+  if (!state.selectedTowerType) { audio.play('invalid'); flashHint('Pick a tower below first! 👇'); return; }
+  if (isPathCell(cell.col, cell.row)) { audio.play('invalid'); flashHint('Not on the path! 🚧'); return; }
+  if (existing) { audio.play('invalid'); flashHint('Already has a tower!'); return; }
+  if (state.spec?.isBoss && !canPlaceInBoss(cell.col, cell.row)) {
+    audio.play('invalid'); flashHint('Would block the monsters! Keep a path open.'); return;
+  }
+  const spec = towerSpec(state.selectedTowerType, 0);
+  if (state.coins < spec.cost) { audio.play('invalid'); flashHint('Not enough coins! 💰'); return; }
+  state.coins -= spec.cost;
+  placeTower(cell.col, cell.row, state.selectedTowerType);
+  if (state.spec?.isBoss) recomputeBossPath();
+  audio.play('place');
+  const c = cellCenter(cell.col, cell.row);
+  spawnSparkles(c.x, c.y, spec.color, 10);
+  updateHUD();
+  if (state.coins < spec.cost) state.selectedTowerType = null;
+  updateTowerBar();
+}
+canvas.addEventListener('click', onCanvasPointer);
+
+// ============== TOWER UPGRADE POPUP ==============
+function openTowerPopup(tower) {
+  const popup = document.getElementById('towerPopup');
+  popup.style.display = 'flex';
+  const spec = TOWERS[tower.type];
+  const current = spec.levels[tower.level];
+  const next = spec.levels[tower.level + 1];
+  const maxLvl = spec.levels.length;
+  const refund = Math.floor(totalTowerValue(tower) * 0.6);
+  const isMax = tower.level >= maxLvl - 1;
+
+  // Build stat comparison strings
+  const statRow = (label, cur, nxt, unit='') => {
+    if (!next) return `<div class="tower-stat">${label} <b>${cur}${unit}</b></div>`;
+    return `<div class="tower-stat">${label} <b>${cur}${unit}</b> → <b style="color:#2B9B63;">${nxt}${unit}</b></div>`;
+  };
+
+  popup.innerHTML = `
+    <div class="tower-card">
+      <div class="tower-emoji">${isMax ? '👑' : ''}${current.emoji}</div>
+      <div class="tower-name">${spec.name}</div>
+      <div class="tower-lvl">Level ${tower.level + 1} / ${maxLvl}</div>
+      <div style="background:var(--cream);border:2px solid var(--ink);border-radius:10px;padding:6px 10px;margin:8px 0 12px;">
+        ${statRow('⚔️ DMG', current.dmg, next?.dmg)}
+        ${statRow('🎯 RANGE', current.range, next?.range)}
+        ${statRow('⚡ SPEED', (1000/current.fireRate).toFixed(1), next ? (1000/next.fireRate).toFixed(1) : null, '/s')}
+      </div>
+      <div class="tower-btns">
+        ${next ? `
+          <button class="tower-btn upgrade ${state.coins < next.cost ? 'disabled' : ''}" id="upgradeBtn">
+            <span>⬆️ Upgrade → Lv${tower.level + 2}</span>
+            <span>💰 ${next.cost}</span>
+          </button>` :
+          `<button class="tower-btn upgrade disabled"><span>⭐ MAX LEVEL!</span><span>—</span></button>`
+        }
+        <button class="tower-btn sell" id="sellBtn">
+          <span>💔 Sell Tower</span>
+          <span>+💰 ${refund}</span>
+        </button>
+        <button class="tower-btn close" id="closePopupBtn">Cancel</button>
+      </div>
+    </div>
+  `;
+  if (next) {
+    document.getElementById('upgradeBtn').addEventListener('click', () => {
+      if (state.coins < next.cost) { audio.play('invalid'); return; }
+      state.coins -= next.cost;
+      tower.level++;
+      audio.play('upgrade');
+      spawnSparkles(tower.x, tower.y, '#FFD66B', 16);
+      updateHUD();
+      closeTowerPopup();
+    });
+  }
+  document.getElementById('sellBtn').addEventListener('click', () => {
+    state.coins += refund;
+    audio.play('sell');
+    spawnSparkles(tower.x, tower.y, '#C7B8EA', 10);
+    state.towers.splice(state.towers.indexOf(tower), 1);
+    if (state.spec?.isBoss) recomputeBossPath();
+    updateHUD();
+    closeTowerPopup();
+  });
+  document.getElementById('closePopupBtn').addEventListener('click', () => {
+    audio.play('click'); closeTowerPopup();
+  });
+  popup.addEventListener('click', (ev) => { if (ev.target === popup) closeTowerPopup(); }, { once:true });
+}
+function closeTowerPopup() {
+  const popup = document.getElementById('towerPopup');
+  popup.style.display = 'none';
+  popup.innerHTML = '';
+}
+function totalTowerValue(tower) {
+  const levels = TOWERS[tower.type].levels;
+  let total = 0;
+  for (let i = 0; i <= tower.level; i++) total += levels[i].cost;
+  return total;
+}
+
+// ============== UI ==============
+function updateHUD() {
+  document.getElementById('livesTxt').textContent = state.lives;
+  document.getElementById('coinsTxt').textContent = state.coins;
+  document.getElementById('levelTxt').textContent = state.level;
+  document.getElementById('levelNumTxt').textContent = state.levelNum + (state.spec?.isBoss ? ' 👹' : '');
+  updateTowerBar();
+}
+function flashHeart() {
+  const pill = document.querySelector('.hud-pill.lives');
+  if (!pill) return;
+  pill.style.animation = 'shake 0.4s';
+  setTimeout(() => { pill.style.animation = ''; }, 400);
+}
+function buildTowerBar() {
+  const bar = document.getElementById('towerBar');
+  bar.innerHTML = '';
+  for (const key of Object.keys(TOWERS)) {
+    const spec = towerSpec(key, 0);
+    const chip = document.createElement('div');
+    chip.className = 'tower-chip'; chip.dataset.key = key;
+    chip.innerHTML = `<span class="emoji">${spec.emoji}</span><div class="cost">💰${spec.cost}</div>`;
+    chip.addEventListener('click', () => {
+      if (state.phase !== 'prep') { audio.play('invalid'); flashHint('Prep phase only!'); return; }
+      if (state.coins < spec.cost) { audio.play('invalid'); flashHint(`Need ${spec.cost} coins!`); return; }
+      audio.play('select');
+      state.selectedTowerType = (state.selectedTowerType === key) ? null : key;
+      updateTowerBar();
+      if (state.selectedTowerType) flashHint(`Tap a glowing tile to place!`);
+    });
+    bar.appendChild(chip);
+  }
+}
+function updateTowerBar() {
+  document.querySelectorAll('.tower-chip').forEach(chip => {
+    const key = chip.dataset.key;
+    const spec = towerSpec(key, 0);
+    const disabled = state.coins < spec.cost || state.phase !== 'prep';
+    chip.classList.toggle('selected', state.selectedTowerType === key);
+    chip.classList.toggle('disabled', disabled);
+  });
+}
+let hintTimer = null;
+function flashHint(txt) {
+  const el = document.getElementById('hint');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.animation = 'none'; el.offsetHeight;
+  el.style.animation = 'slideDown 0.3s ease';
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { el.style.display = 'none'; }, 2200);
+}
+function setPhaseBanner(text, color) {
+  const b = document.getElementById('phaseBanner');
+  if (!text) { b.style.display = 'none'; return; }
+  b.textContent = text; b.style.display = 'block';
+  b.style.background = color || 'var(--ink)';
+}
+
+// ============== PHASES ==============
+function enterPrepPhase() {
+  state.phase = 'prep';
+  const totalRounds = state.spec.waves.length;
+  const roundNum = state.currentWaveIdx + 1;
+  const label = state.spec.isBoss
+    ? '👹 BOSS · Build your maze!'
+    : (state.currentWaveIdx === 0
+        ? `🧱 PREP · Round 1 of ${totalRounds}`
+        : `🧱 PREP · Round ${roundNum} of ${totalRounds} · More towers?`);
+  setPhaseBanner(label, state.spec.isBoss ? '#D14D6A' : 'var(--ink)');
+  document.getElementById('sendWaveBtn').classList.remove('hidden');
+  state.selectedTowerType = null;
+  updateTowerBar();
+  audio.setTempo(1.0);
+  if (state.spec.isBoss && state.currentWaveIdx === 0) {
+    flashHint('Build a maze — enemies must still reach the exit! 🌀');
+  } else if (state.currentWaveIdx === 0) {
+    flashHint(`This map has ${totalRounds} rounds. Place towers, then SEND WAVE!`);
+  } else {
+    flashHint(`Round ${roundNum} coming! Add more towers or upgrade existing ones.`);
+  }
+}
+function startWave() {
+  state.phase = 'wave';
+  const totalRounds = state.spec.waves.length;
+  const roundNum = state.currentWaveIdx + 1;
+  setPhaseBanner(`🛡️ ROUND ${roundNum}/${totalRounds} · Defend!`, '#D14D6A');
+  document.getElementById('sendWaveBtn').classList.add('hidden');
+  state.selectedTowerType = null;
+  updateTowerBar();
+  audio.play(state.spec.isBoss ? 'boss' : 'wave');
+  audio.setTempo(1.25);
+  const wave = state.spec.waves[state.currentWaveIdx];
+  state.spawnQueue = wave.enemies.map(e => ({...e, delay: Math.max(400, e.delay || 900)}));
+  state.spawnTimer = 0;
+}
+function updateSpawns(dt) {
+  if (state.spawnQueue.length === 0) return;
+  state.spawnTimer += dt * 1000;
+  const next = state.spawnQueue[0];
+  if (state.spawnTimer >= next.delay) {
+    spawnEnemy(next);
+    state.spawnQueue.shift();
+    state.spawnTimer = 0;
+  }
+}
+function checkWaveEnd() {
+  if (state.phase !== 'wave') return;
+  if (state.spawnQueue.length === 0 && state.enemies.length === 0) {
+    // Wave cleared → study phase → quiz
+    startStudyPhase();
+  }
+}
+
+// ============== STUDY PHASE (Option A: learn before being tested) ==============
+function startStudyPhase() {
+  state.phase = 'quiz'; // block further wave updates
+  setPhaseBanner('📖 STUDY TIME', '#2B9B63');
+  document.getElementById('sendWaveBtn').classList.add('hidden');
+  audio.setTempo(0.85);
+
+  // Pick the questions that will be in the upcoming quiz
+  const count = state.spec.questionsPerWave[state.currentWaveIdx] || 3;
+  const upcoming = pickQuestionsForQuiz(state.level, state.subject, count);
+  state.quizQuestions = upcoming;
+
+  // Filter to only unseen questions (skip study for review/mastered questions)
+  const h = progress.getHistory(state.level);
+  const seenSet = new Set(h.seen);
+  const unseenCards = upcoming.filter(q => q._id && !seenSet.has(q._id));
+
+  if (unseenCards.length === 0) {
+    // All questions are review — skip straight to quiz
+    launchQuiz();
+    return;
+  }
+
+  // Show study cards for unseen questions
+  audio.play('quiz');
+  showStudyCards(unseenCards, () => launchQuiz());
+}
+
+function showStudyCards(cards, onDone) {
+  const overlay = document.getElementById('quizOverlay');
+  overlay.style.display = 'flex';
+  let idx = 0;
+
+  function renderCard() {
+    const card = cards[idx];
+    const icons = ['📚','💡','🧠','✨','🎓','🌟','📖','🔑'];
+    const isKorean = state.mode === 'adults' && state.subject === 'korean';
+    const stage = isKorean ? getKoreanStage(state.levelNum) : null;
+    overlay.className = 'study-overlay';
+    overlay.innerHTML = `
+      <div class="study-banner">📖 Study Time!</div>
+      <div class="study-sub">${stage ? stage.name : 'Learn before the quiz'}</div>
+      <div class="study-progress" id="studyPips"></div>
+      <div class="study-card">
+        <div class="study-icon">${icons[idx % icons.length]}</div>
+        <div class="study-q">${card.q}</div>
+        <div class="study-answer">→ ${card.opts[card.a]}</div>
+        ${card.exp ? `<div class="study-exp">${card.exp}</div>` : ''}
+        ${card.topic ? `<div class="study-source">📖 ${card.topic}</div>` : ''}
+      </div>
+      <button class="start-btn" id="studyNextBtn">${idx < cards.length - 1 ? 'GOT IT! ✨' : 'START QUIZ 🎓'}</button>
+    `;
+    // Pips
+    const pips = document.getElementById('studyPips');
+    for (let i = 0; i < cards.length; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'study-pip' + (i < idx ? ' done' : (i === idx ? ' active' : ''));
+      pips.appendChild(pip);
+    }
+    document.getElementById('studyNextBtn').addEventListener('click', () => {
+      audio.play('click');
+      idx++;
+      if (idx >= cards.length) {
+        overlay.className = 'quiz-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+        onDone();
+      } else {
+        renderCard();
+      }
+    });
+  }
+  renderCard();
+}
+
+// ============== QUIZ ==============
+const COIN_PER_CORRECT = 15;
+const PERFECT_BONUS = 30;
+
+function launchQuiz() {
+  // state.quizQuestions already set by startStudyPhase
+  state.quizIndex = 0;
+  state.quizCorrect = 0;
+  state.quizResults = [];
+  setPhaseBanner('🎓 QUIZ ROUND', '#6B4FA0');
+  audio.play('quiz');
+  renderQuizQuestion();
+}
+function renderQuizQuestion() {
+  const overlay = document.getElementById('quizOverlay');
+  overlay.style.display = 'flex';
+  const q = state.quizQuestions[state.quizIndex];
+  const total = state.quizQuestions.length;
+  const idx = state.quizIndex;
+  const emojis = ['🐰','🐻','🚓','🚗','👸','🐼','🦄','🦉'];
+  const towerEmoji = emojis[idx % emojis.length];
+  const totalRounds = state.spec.waves.length;
+  const roundNum = state.currentWaveIdx + 1;
+  // Show review badge if this question is in the user's mistakes pile
+  const isReview = q._id && progress.isMistake(state.level, q._id);
+  overlay.innerHTML = `
+    <div class="quiz-banner">🎓 Round ${roundNum}/${totalRounds} Quiz</div>
+    <div class="quiz-progress">Question ${idx+1} of ${total}</div>
+    <div class="quiz-dots" id="quizDots"></div>
+    <div class="question-card">
+      ${isReview ? '<div class="q-review">🔁 REVIEW · You missed this one before!</div>' : ''}
+      <div class="q-tower">${towerEmoji}</div>
+      <div class="q-subject">${state.level} · ${getSubjectLabel(state.subject)}</div>
+      ${q.topic ? `<div class="q-source">📖 ${q.topic}</div>` : ''}
+      <div class="q-text">${q.q}</div>
+      ${(isReview && q.exp) ? `<button class="hint-btn" id="hintBtn">💡 Show Hint</button><div class="hint-reveal" id="hintReveal" style="display:none;">💡 ${q.exp}</div>` : ''}
+      <div class="q-options">
+        ${q.opts.map((o,i) => `<button class="q-option" data-i="${i}">${o}</button>`).join('')}
+      </div>
+    </div>
+  `;
+  const dotsEl = document.getElementById('quizDots');
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'quiz-dot';
+    if (i < state.quizResults.length) dot.classList.add(state.quizResults[i] ? 'done' : 'wrong');
+    else if (i === state.quizIndex) dot.classList.add('current');
+    dotsEl.appendChild(dot);
+  }
+  // Hint button for review questions
+  const hintBtn = document.getElementById('hintBtn');
+  if (hintBtn) {
+    hintBtn.addEventListener('click', () => {
+      audio.play('click');
+      hintBtn.style.display = 'none';
+      document.getElementById('hintReveal').style.display = 'block';
+    });
+  }
+  overlay.querySelectorAll('.q-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.i;
+      overlay.querySelectorAll('.q-option').forEach(b => b.style.pointerEvents = 'none');
+      const correct = i === q.a;
+      state.quizResults.push(correct);
+      state.totalAnswered++;
+      // Record in history for smart picker — won't be re-asked unless they got it wrong
+      if (q._id) progress.recordAnswer(state.level, q._id, correct);
+      if (correct) {
+        btn.classList.add('correct');
+        audio.play('correct');
+        state.quizCorrect++;
+        state.totalCorrect++;
+      } else {
+        btn.classList.add('wrong');
+        audio.play('wrong');
+        const cb = overlay.querySelector(`.q-option[data-i="${q.a}"]`);
+        if (cb) cb.classList.add('correct');
+        // Show the correct answer + explanation so the user learns
+        const reveal = document.createElement('div');
+        reveal.className = 'correct-reveal';
+        reveal.innerHTML = `✅ Correct answer: <b>${q.opts[q.a]}</b>${q.exp ? `<span class="exp-text">💡 ${q.exp}</span>` : ''}`;
+        const card = overlay.querySelector('.question-card');
+        if (card) card.appendChild(reveal);
+      }
+      setTimeout(() => {
+        state.quizIndex++;
+        if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
+        else renderQuizQuestion();
+      }, correct ? 650 : 2000);
+    });
+  });
+}
+function showQuizSummary() {
+  const overlay = document.getElementById('quizOverlay');
+  const total = state.quizQuestions.length;
+  const correct = state.quizCorrect;
+  const coinsEarned = correct * COIN_PER_CORRECT;
+  const perfect = correct === total;
+  const bonus = perfect ? PERFECT_BONUS : 0;
+  state.coins += coinsEarned + bonus;
+  updateHUD();
+  if (perfect) audio.play('perfect');
+  const emoji = perfect ? '🌟' : (correct >= Math.ceil(total * 0.6) ? '🎉' : '💪');
+  const title = perfect ? 'PERFECT!' : (correct >= Math.ceil(total * 0.6) ? 'Well Done!' : 'Keep trying!');
+  const isLastWave = state.currentWaveIdx >= state.spec.waves.length - 1;
+  const totalRounds = state.spec.waves.length;
+  const nextRoundNum = state.currentWaveIdx + 2;
+  overlay.innerHTML = `
+    <div class="summary-big">${emoji}</div>
+    <div class="summary-title">${title}</div>
+    <div class="summary-stats">You got <b>${correct} / ${total}</b> correct!</div>
+    <div class="reward-line">+${coinsEarned}💰 from answers</div>
+    ${bonus > 0 ? `<div class="bonus-line">✨ +${bonus}💰 PERFECT BONUS! ✨</div>` : '<div style="height:14px;"></div>'}
+    ${!isLastWave ? `<div style="font-family:'Fredoka',sans-serif;font-size:13px;color:#6B4FA0;margin-bottom:10px;font-weight:600;">💡 Spend coins on more towers or upgrades before Round ${nextRoundNum}!</div>` : ''}
+    <button class="start-btn" id="continueBtn">${isLastWave ? 'FINISH LEVEL 🏆' : `ROUND ${nextRoundNum}/${totalRounds} ▶️`}</button>
+  `;
+  document.getElementById('continueBtn').addEventListener('click', () => {
+    audio.play('click');
+    overlay.style.display = 'none'; overlay.innerHTML = '';
+    if (isLastWave) {
+      gameOver(true);
+    } else {
+      state.currentWaveIdx++;
+      updateHUD();
+      enterPrepPhase();
+    }
+  });
+}
+
+// ============== LOOP ==============
+let lastT = 0;
+function loop(now) {
+  if (!state.running) return;
+  const dt = Math.min(0.05, (now - lastT) / 1000 || 0);
+  lastT = now;
+  if (state.phase === 'wave') {
+    updateSpawns(dt);
+    updateEnemies(dt);
+    updateTowers(dt);
+    updateProjectiles(dt);
+    checkWaveEnd();
+  }
+  updateSparkles(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ============== START / END LEVEL ==============
+function startLevel(levelNum) {
+  state.levelNum = levelNum;
+  state.spec = getLevelSpec(levelNum);
+  state.lives = state.spec.lives;
+  state.coins = state.spec.startCoins;
+  state.currentWaveIdx = 0;
+  state.enemies = []; state.towers = []; state.projectiles = [];
+  state.sparkles = []; state.spawnQueue = [];
+  state.running = true;
+  state.selectedTowerType = null;
+  state.totalCorrect = 0; state.totalAnswered = 0;
+  state.bossPath = null;
+
+  if (state.spec.isBoss) recomputeBossPath();
+  flowerCache = null; // regenerate flowers for new layout
+
+  audio.init(); audio.resume();
+  audio.startMusic();
+
+  showGameplayUI();
+  updateHUD();
+  buildTowerBar();
+
+  // Show intro modal
+  showLevelStartModal(() => {
+    enterPrepPhase();
+    lastT = performance.now();
+    requestAnimationFrame(loop);
+  });
+}
+
+// Korean curriculum stage labels based on level number
+function getKoreanStage(n) {
+  if (n <= 30) return {name:'Stage 1: Hangul', desc:'Learn to read the Korean alphabet', emoji:'🔤'};
+  if (n <= 60) return {name:'Stage 2: Greetings', desc:'Survival phrases & basic expressions', emoji:'👋'};
+  if (n <= 100) return {name:'Stage 3: Numbers & Time', desc:'Counting, telling time, days & dates', emoji:'🔢'};
+  if (n <= 160) return {name:'Stage 4: Vocabulary', desc:'Family, food, body, colors, places', emoji:'📖'};
+  if (n <= 220) return {name:'Stage 5: Verbs & Adjectives', desc:'Action words & descriptions', emoji:'🏃'};
+  if (n <= 280) return {name:'Stage 6: Particles', desc:'How Korean glues words together', emoji:'🧩'};
+  if (n <= 350) return {name:'Stage 7: Sentences', desc:'Building real Korean sentences', emoji:'💬'};
+  if (n <= 420) return {name:'Stage 8: Real Life', desc:'Shopping, transport, restaurants, jobs', emoji:'🌍'};
+  return {name:'Stage 9: Grammar', desc:'Tense, adverbs, conjugation — TOPIK I ready!', emoji:'🎓'};
+}
+
+function showLevelStartModal(onStart) {
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  const s = state.spec;
+  const mapNames = ['Zigzag Valley', 'Curvy Creek', 'Spiral Hills', 'Cross Meadow', 'Wavy Woods'];
+  const mapLabel = s.isBoss ? 'Boss Arena' : mapNames[s.variant];
+  const isKorean = state.mode === 'adults' && state.subject === 'korean';
+  const stage = isKorean ? getKoreanStage(s.n) : null;
+  modal.innerHTML = `
+    <div class="level-start-card">
+      <span class="mascot">${s.isBoss ? '👹' : (stage ? stage.emoji : '🌸')}</span>
+      <h2>${s.isBoss ? 'BOSS BATTLE' : `Level ${s.n}`}</h2>
+      <div class="type">${state.level === 'beginner' ? '초급 (TOPIK I)' : state.level} · ${getSubjectLabel(state.subject)} · ${mapLabel}</div>
+      ${stage ? `<div style="font-family:'Fredoka',sans-serif;font-size:14px;color:#6B4FA0;font-weight:700;margin:6px 0;">${stage.name}</div><div style="font-family:'Fredoka',sans-serif;font-size:12px;color:#7A6A7C;margin-bottom:8px;">${stage.desc}</div>` : ''}
+      <div class="info">
+        ${s.isBoss
+          ? `Build a maze of towers to slow the monsters!<br>You <b>can't fully block</b> the path.<br>🌊 ${s.waves.length} round · 💰${s.startCoins} · ❤️${s.lives}`
+          : `<b>${s.waves.length} rounds</b> on this map — add more towers between each round!<br>💰${s.startCoins} to start · ❤️${s.lives} lives`
+        }
+      </div>
+      <button class="start-btn" id="beginBtn">LET'S GO ✨</button>
+    </div>
+  `;
+  document.getElementById('beginBtn').addEventListener('click', () => {
+    audio.play('click');
+    modal.style.display = 'none'; modal.innerHTML = '';
+    onStart();
+  });
+}
+
+async function gameOver(win) {
+  state.phase = 'end';
+  state.running = false;
+  setPhaseBanner(null);
+  document.getElementById('sendWaveBtn').classList.add('hidden');
+  audio.stopMusic();
+  audio.play(win ? 'victory' : 'defeat_game');
+
+  // Calculate stars (0-3) based on lives remaining + quiz accuracy
+  let stars = 0;
+  if (win) {
+    stars = 1;
+    const acc = state.totalAnswered ? state.totalCorrect / state.totalAnswered : 1;
+    if (acc >= 0.6 && state.lives >= 3) stars = 2;
+    if (acc >= 0.9 && state.lives >= 4) stars = 3;
+    await progress.complete(state.level, state.subject, state.levelNum, stars);
+  }
+
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const starStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  const nextN = state.levelNum + 1;
+  const canContinue = win && nextN <= 500;
+  modal.innerHTML = `
+    <div class="level-start-card">
+      <span class="mascot">${win ? '🏆' : '😿'}</span>
+      <h2>${win ? 'Level Complete!' : 'Oh No!'}</h2>
+      <div class="type">${state.level} · ${getSubjectLabel(state.subject)} · Level ${state.levelNum}</div>
+      <div class="info">
+        ${win ? `<div style="font-size:28px; margin:4px 0 8px;">${starStr}</div>` : ''}
+        Quiz: ${state.totalCorrect}/${state.totalAnswered} (${acc}%)<br>
+        ${win ? `Coins: 💰${state.coins}` : `Reached round ${state.currentWaveIdx + 1}`}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:stretch;">
+        <button class="start-btn" id="completeBtn">${win ? 'COMPLETE ✓' : 'BACK TO MAP 🗺️'}</button>
+        ${canContinue ? `<button class="secondary-btn" id="nextLevelBtn">Play Level ${nextN} ▶️</button>` : ''}
+      </div>
+    </div>
+  `;
+  document.getElementById('completeBtn').addEventListener('click', async () => {
+    audio.play('click');
+    modal.style.display = 'none'; modal.innerHTML = '';
+    hideGameplayUI();
+    await showJourneyScreen();
+  });
+  if (canContinue) {
+    document.getElementById('nextLevelBtn').addEventListener('click', () => {
+      audio.play('click');
+      modal.style.display = 'none'; modal.innerHTML = '';
+      startLevel(nextN);
+    });
+  }
+}
+
+// ============== SCREENS ==============
+function hideGameplayUI() {
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('towerBar').style.display = 'none';
+  document.getElementById('soundControls').style.display = 'none';
+  setPhaseBanner(null);
+}
+function showGameplayUI() {
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('towerBar').style.display = 'flex';
+  document.getElementById('soundControls').style.display = 'flex';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('journeyScreen').classList.add('hidden');
+}
+
+async function showJourneyScreen() {
+  state.screen = 'journey';
+  hideGameplayUI();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('journeyScreen').classList.remove('hidden');
+  await progress.load();
+  const unlocked = progress.getUnlocked(state.level, state.subject);
+  const isKorean = state.mode === 'adults' && state.subject === 'korean';
+  const lvlLabel = state.mode === 'adults'
+    ? {beginner:'초급 (TOPIK I)',intermediate:'중급 (TOPIK II)',advanced:'고급 (TOPIK II)',native:'원어민'}[state.level] || state.level
+    : state.level;
+  document.getElementById('journeyTitle').textContent = `${lvlLabel} · ${getSubjectLabel(state.subject)}`;
+  const stage = isKorean ? getKoreanStage(unlocked) : null;
+  document.getElementById('journeySub').textContent = stage
+    ? `Level ${unlocked} · ${stage.name}`
+    : `Level ${unlocked} of 500 · 50 boss battles`;
+  renderJourneyMap(unlocked);
+  // scroll to current level
+  setTimeout(() => {
+    const cur = document.querySelector('.journey-node.current');
+    if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 50);
+}
+
+function renderJourneyMap(unlocked) {
+  const container = document.getElementById('journeyMap');
+  container.innerHTML = '';
+
+  const total = 500;
+  const showUpTo = Math.min(total, Math.max(40, unlocked + 20));
+
+  // Layout: sine-wave path
+  const width = 300;
+  const centerX = width / 2;
+  const amplitude = 95;
+  const spacing = 92;
+  const topPad = 50;
+  const bottomPad = 40;
+  const totalHeight = topPad + bottomPad + (showUpTo - 1) * spacing;
+
+  container.style.width = width + 'px';
+  container.style.height = totalHeight + 'px';
+
+  // Compute positions
+  const positions = [];
+  for (let i = 0; i < showUpTo; i++) {
+    const n = i + 1;
+    const y = topPad + i * spacing;
+    const x = centerX + Math.sin(i * 0.58) * amplitude;
+    positions.push({ n, x, y });
+  }
+
+  // SVG dashed path connecting consecutive nodes
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'journey-svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${totalHeight}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  for (let i = 0; i < positions.length - 1; i++) {
+    const a = positions[i], b = positions[i + 1];
+    const path = document.createElementNS(svgNS, 'path');
+    const cy = (a.y + b.y) / 2;
+    const d = `M ${a.x} ${a.y} C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`;
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', a.n <= unlocked ? '#C7B8EA' : 'rgba(199,184,234,0.3)');
+    path.setAttribute('stroke-width', '6');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-dasharray', '7 8');
+    path.setAttribute('fill', 'none');
+    svg.appendChild(path);
+  }
+  container.appendChild(svg);
+
+  // Checkpoint banners every 25 levels (between 24 and 25, etc.)
+  for (let cp = 25; cp <= showUpTo; cp += 25) {
+    const cpY = topPad + (cp - 1) * spacing - spacing / 2;
+    const banner = document.createElement('div');
+    banner.className = 'journey-checkpoint';
+    banner.textContent = `⸺ LEVEL ${cp} ⸺`;
+    banner.style.top = cpY + 'px';
+    container.appendChild(banner);
+  }
+
+  // Nodes
+  for (const pos of positions) {
+    const n = pos.n;
+    const isBoss = n % 10 === 0;
+    const isLocked = n > unlocked;
+    const isCurrent = n === unlocked;
+    const stars = progress.getStars(state.level, state.subject, n);
+
+    const node = document.createElement('div');
+    node.className = 'journey-node';
+    if (isBoss) node.classList.add('boss');
+    if (isLocked) node.classList.add('locked');
+    else if (isCurrent) node.classList.add('current');
+    else node.classList.add('completed');
+
+    node.style.left = pos.x + 'px';
+    node.style.top = pos.y + 'px';
+
+    // Always show the level number
+    let html = `<span class="n-num">${n}</span>`;
+
+    // Stars (only if level completed with stars)
+    if (!isLocked && !isCurrent && stars >= 0) {
+      const showStars = stars > 0;
+      if (showStars) {
+        html += `<span class="n-stars">`;
+        for (let s = 0; s < 3; s++) {
+          html += `<span class="star${s < stars ? ' filled' : ''}">★</span>`;
+        }
+        html += `</span>`;
+      }
+    }
+
+    // Boss badge
+    if (isBoss) html += `<span class="n-badge">👹</span>`;
+    // Lock overlay badge (doesn't replace number)
+    if (isLocked) html += `<span class="n-lock">🔒</span>`;
+
+    node.innerHTML = html;
+
+    if (!isLocked) {
+      node.addEventListener('click', () => {
+        audio.init(); audio.resume(); audio.play('click');
+        startLevel(n);
+      });
+    }
+
+    container.appendChild(node);
+  }
+}
+
+function showStartScreen() {
+  state.screen = 'start';
+  hideGameplayUI();
+  document.getElementById('modeScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('journeyScreen').classList.add('hidden');
+}
+function showModeScreen() {
+  state.screen = 'mode';
+  hideGameplayUI();
+  document.getElementById('modeScreen').classList.remove('hidden');
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('journeyScreen').classList.add('hidden');
+}
+
+// ============== INIT ==============
+const LEVEL_COLORS = {
+  K2: { bg: '#FFD66B', border: '#C99400', text: '#3D2E3F' },
+  P1: { bg: '#FFB8A0', border: '#D14D6A', text: '#3D2E3F' },
+  P2: { bg: '#C7B8EA', border: '#6B4FA0', text: '#3D2E3F' },
+  P3: { bg: '#A8E6CF', border: '#2B9B63', text: '#3D2E3F' },
+  beginner: { bg: '#A8E6CF', border: '#2B9B63', text: '#3D2E3F' },
+  intermediate: { bg: '#A0D8F0', border: '#1976D2', text: '#3D2E3F' },
+  advanced: { bg: '#C7B8EA', border: '#6B4FA0', text: '#3D2E3F' },
+  native: { bg: '#FF8FB8', border: '#C14777', text: '#FFFFFF' },
+};
+const SUBJECT_COLORS = {
+  math:    { bg: '#A8E6CF', border: '#2B9B63', text: '#3D2E3F' },
+  english: { bg: '#A0D8F0', border: '#4A8BB8', text: '#3D2E3F' },
+  chinese: { bg: '#FF8FB8', border: '#C14777', text: '#FFFFFF' },
+  mixed:   { bg: '#FFD66B', border: '#C99400', text: '#3D2E3F' },
+  korean:  { bg: '#A0D8F0', border: '#1565C0', text: '#3D2E3F' },
+};
+
+function applySelectedStyle(card, colors) {
+  if (!colors) return;
+  card.style.backgroundColor = colors.bg;
+  card.style.borderColor = colors.border;
+  card.style.color = colors.text;
+  card.style.transform = 'translateY(-3px)';
+  card.style.boxShadow = '0 8px 0 #3D2E3F';
+  const badge = card.querySelector('.check-badge');
+  if (badge) badge.style.display = 'flex';
+}
+function clearSelectedStyle(card) {
+  card.style.backgroundColor = '';
+  card.style.borderColor = '';
+  card.style.color = '';
+  card.style.transform = '';
+  card.style.boxShadow = '';
+  const badge = card.querySelector('.check-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+// ---- Gameplay tuning per mode ----
+function getModeTuning() {
+  if (state.mode === 'adults') {
+    return { lives: 3, startCoinsMul: 0.8, enemySpeedMul: 1.2, questionsExtra: 2, studySkippable: true, wrongDelay: 1500 };
+  }
+  return { lives: null, startCoinsMul: 1.0, enemySpeedMul: 1.0, questionsExtra: 0, studySkippable: false, wrongDelay: 2000 };
+}
+
+// ---- Build start screen dynamically based on mode ----
+function buildStartScreen(mode) {
+  state.mode = mode;
+  const screen = document.getElementById('startScreen');
+  if (mode === 'kids') {
+    state.level = 'P1'; state.subject = 'mixed';
+    screen.innerHTML = `
+      <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
+      <div class="title">Kids Mode</div>
+      <div class="subtitle">Singapore MOE syllabus · K2 to P3<br><span style="font-size:11px;opacity:0.85;">NEL · My Pals Are Here! · STELLAR · 欢乐伙伴</span></div>
+      <div class="label">Your level</div>
+      <div class="level-grid" id="levelGrid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+        <div class="level-card" data-level="K2"><div class="check-badge">✓</div><div class="code">K2</div><div class="age">Age 5-6</div></div>
+        <div class="level-card selected" data-level="P1"><div class="check-badge">✓</div><div class="code">P1</div><div class="age">Age 7</div></div>
+        <div class="level-card" data-level="P2"><div class="check-badge">✓</div><div class="code">P2</div><div class="age">Age 8</div></div>
+        <div class="level-card" data-level="P3"><div class="check-badge">✓</div><div class="code">P3</div><div class="age">Age 9</div></div>
+      </div>
+      <div class="label">Subject</div>
+      <div class="subject-grid" id="subjectGrid">
+        <div class="subject-card" data-subject="math"><div class="check-badge">✓</div><span class="emoji">➕</span><div class="name">Math</div><div class="sub">Numbers</div></div>
+        <div class="subject-card" data-subject="english"><div class="check-badge">✓</div><span class="emoji">📚</span><div class="name">English</div><div class="sub">Spelling · Grammar</div></div>
+        <div class="subject-card" data-subject="chinese"><div class="check-badge">✓</div><span class="emoji">🀄</span><div class="name">华文</div><div class="sub">汉字 · Pinyin</div></div>
+        <div class="subject-card selected" data-subject="mixed"><div class="check-badge">✓</div><span class="emoji">🌈</span><div class="name">Mixed</div><div class="sub">All three!</div></div>
+      </div>
+      <button class="start-btn" id="startBtn">START P1 · Mixed ✨</button>
+      <button class="secondary-btn" id="backToModeBtn" style="margin-top:10px;">← Change mode</button>
+    `;
+  } else {
+    state.level = 'beginner'; state.subject = 'korean';
+    screen.innerHTML = `
+      <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
+      <div class="title">Adults Mode</div>
+      <div class="subtitle">Language learning through tower defense!<br><span style="font-size:11px;opacity:0.85;">Beginner to native speaker · 500 levels per tier</span></div>
+      <div class="label">Proficiency tier</div>
+      <div class="level-grid" id="levelGrid" style="grid-template-columns:1fr 1fr;">
+        <div class="level-card selected" data-level="beginner"><div class="check-badge">✓</div><div class="code">초급</div><div class="age">Beginner · TOPIK I</div></div>
+        <div class="level-card coming-soon" data-level="intermediate"><div class="check-badge">✓</div><div class="code">중급</div><div class="age">Intermediate · TOPIK II</div></div>
+        <div class="level-card coming-soon" data-level="advanced"><div class="check-badge">✓</div><div class="code">고급</div><div class="age">Advanced · TOPIK II</div></div>
+        <div class="level-card coming-soon" data-level="native"><div class="check-badge">✓</div><div class="code">원어민</div><div class="age">Native</div></div>
+      </div>
+      <div class="label">Language</div>
+      <div class="subject-grid" id="subjectGrid">
+        <div class="subject-card selected" data-subject="korean"><div class="check-badge">✓</div><span class="emoji">🇰🇷</span><div class="name">Korean</div><div class="sub">한국어</div></div>
+        <div class="subject-card coming-soon" data-subject="japanese"><div class="check-badge">✓</div><span class="emoji">🇯🇵</span><div class="name">Japanese</div><div class="sub">Coming soon</div></div>
+      </div>
+      <button class="start-btn" id="startBtn">START 초급 · Korean 🇰🇷 ✨</button>
+      <button class="secondary-btn" id="backToModeBtn" style="margin-top:10px;">← Change mode</button>
+    `;
+  }
+  // Wire up selection handlers
+  wireStartScreenHandlers();
+  showStartScreen();
+}
+
+function wireStartScreenHandlers() {
+  // Apply initial selected styles
+  document.querySelectorAll('#levelGrid .level-card.selected').forEach(card => {
+    applySelectedStyle(card, LEVEL_COLORS[card.dataset.level]);
+  });
+  document.querySelectorAll('#subjectGrid .subject-card.selected').forEach(card => {
+    applySelectedStyle(card, SUBJECT_COLORS[card.dataset.subject]);
+  });
+  updateStartButton();
+
+  // Level grid
+  document.getElementById('levelGrid').addEventListener('click', (e) => {
+    const card = e.target.closest('.level-card');
+    if (!card || card.classList.contains('selected') || card.classList.contains('coming-soon')) return;
+    document.querySelectorAll('#levelGrid .level-card').forEach(c => { c.classList.remove('selected'); clearSelectedStyle(c); });
+    card.classList.add('selected');
+    applySelectedStyle(card, LEVEL_COLORS[card.dataset.level]);
+    state.level = card.dataset.level;
+    audio.init(); audio.resume(); audio.play('select');
+    updateStartButton();
+  });
+  // Subject grid
+  document.getElementById('subjectGrid').addEventListener('click', (e) => {
+    const card = e.target.closest('.subject-card');
+    if (!card || card.classList.contains('selected') || card.classList.contains('coming-soon')) return;
+    document.querySelectorAll('#subjectGrid .subject-card').forEach(c => { c.classList.remove('selected'); clearSelectedStyle(c); });
+    card.classList.add('selected');
+    applySelectedStyle(card, SUBJECT_COLORS[card.dataset.subject]);
+    state.subject = card.dataset.subject;
+    audio.init(); audio.resume(); audio.play('select');
+    updateStartButton();
+  });
+  // Start button
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    audio.init(); audio.resume(); audio.play('click');
+    await showJourneyScreen();
+  });
+  // Back to mode
+  document.getElementById('backToModeBtn').addEventListener('click', () => {
+    audio.play('click'); showModeScreen();
+  });
+}
+
+function updateStartButton() {
+  const btn = document.getElementById('startBtn');
+  if (!btn) return;
+  const lvlLabel = state.mode === 'adults'
+    ? {beginner:'초급 (TOPIK I)',intermediate:'중급 (TOPIK II)',advanced:'고급 (TOPIK II)',native:'원어민'}[state.level] || state.level
+    : state.level;
+  const subj = getSubjectLabel(state.subject);
+  btn.innerHTML = `START ${lvlLabel} · ${subj} ✨`;
+  btn.dataset.subject = state.subject;
+  const c = SUBJECT_COLORS[state.subject];
+  if (c) { btn.style.backgroundColor = c.bg; btn.style.color = c.text; }
+}
+
+// ---- Mode selection ----
+document.getElementById('modeGrid').addEventListener('click', (e) => {
+  const card = e.target.closest('.mode-card');
+  if (!card) return;
+  audio.init(); audio.resume(); audio.play('click');
+  buildStartScreen(card.dataset.mode);
+});
+
+// ---- Persistent UI handlers ----
+document.getElementById('journeyBackBtn').addEventListener('click', () => {
+  audio.play('click'); showStartScreen();
+});
+document.getElementById('backBtn').addEventListener('click', async () => {
+  audio.play('click');
+  audio.stopMusic();
+  state.running = false;
+  state.phase = 'menu';
+  document.getElementById('levelStartModal').style.display = 'none';
+  document.getElementById('levelStartModal').innerHTML = '';
+  document.getElementById('towerPopup').style.display = 'none';
+  document.getElementById('towerPopup').innerHTML = '';
+  document.getElementById('quizOverlay').style.display = 'none';
+  document.getElementById('quizOverlay').innerHTML = '';
+  await showJourneyScreen();
+});
+document.getElementById('sendWaveBtn').addEventListener('click', () => {
+  if (state.phase === 'prep') { audio.play('click'); startWave(); }
+});
+const musicBtn = document.getElementById('musicBtn');
+const sfxBtn = document.getElementById('sfxBtn');
+musicBtn.addEventListener('click', () => {
+  audio.init(); audio.resume();
+  const on = audio.toggleMusic();
+  musicBtn.classList.toggle('off', !on);
+});
+sfxBtn.addEventListener('click', () => {
+  audio.init(); audio.resume();
+  const on = audio.toggleSfx();
+  sfxBtn.classList.toggle('off', !on);
+  sfxBtn.textContent = on ? '🔊' : '🔇';
+  if (on) audio.play('click');
+});
+
+resize();
+progress.load();
+</script>
+</body>
+</html>
