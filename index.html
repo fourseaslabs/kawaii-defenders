@@ -2114,6 +2114,7 @@ function updateTowers(dt) {
     const rangePx = spec.range * state.tileSize;
     let target = null, best = Infinity;
     for (const e of state.enemies) {
+      if (e.segment < 1) continue; // Still off-screen — invulnerable until visible
       const d = Math.hypot(e.x - t.x, e.y - t.y);
       if (d < rangePx && d < best) { best = d; target = e; }
     }
