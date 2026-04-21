@@ -1575,7 +1575,6 @@ const progress = {
 function pickQuestionsForQuiz(lvl, subj, count) {
   let pool = getQuestionPool(lvl, subj);
   // Staged curriculum: filter by minLevel if questions have ml tags.
-  // Only show questions the player has "unlocked" based on their current level.
   const currentLevel = state.levelNum || 1;
   pool = pool.filter(q => !q.ml || q.ml <= currentLevel);
 
@@ -1583,11 +1582,12 @@ function pickQuestionsForQuiz(lvl, subj, count) {
   const seenSet = new Set(h.seen);
   const mistakesSet = new Set(h.mistakes);
 
-  const mistakes = [], unseen = [], mastered = [];
+  const mistakes = [], unseen = [];
   for (const q of pool) {
     if (mistakesSet.has(q._id)) mistakes.push(q);
-    else if (seenSet.has(q._id)) mastered.push(q);
-    else unseen.push(q);
+    else if (!seenSet.has(q._id)) unseen.push(q);
+    // Mastered questions (seen + correct) are NEVER re-used — truly gone until
+    // the user gets them wrong again somewhere else.
   }
   const shuffle = arr => { const a = [...arr]; for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 
@@ -1605,10 +1605,9 @@ function pickQuestionsForQuiz(lvl, subj, count) {
   const stillNeed1 = count - picked.length;
   if (stillNeed1 > 0) picked.push(...shuffle(extraMistakesAvailable).slice(0, stillNeed1));
 
-  // Last resort: mastered questions (only when the pool is truly exhausted)
-  const stillNeed2 = count - picked.length;
-  if (stillNeed2 > 0) picked.push(...shuffle(mastered).slice(0, stillNeed2));
-
+  // If pool is fully exhausted (everything mastered, no mistakes) — return
+  // whatever we have, even if fewer than requested. The quiz phase handles
+  // empty arrays gracefully by auto-skipping.
   return shuffle(picked);
 }
 
@@ -2299,6 +2298,15 @@ function startStudyPhase() {
   const upcoming = pickQuestionsForQuiz(state.level, state.subject, count);
   state.quizQuestions = upcoming;
 
+  // If ALL questions in the pool are mastered — no quiz needed! Award bonus and move on.
+  if (upcoming.length === 0) {
+    audio.play('perfect');
+    state.coins += 20;
+    updateHUD();
+    showMasteredSkip();
+    return;
+  }
+
   // Filter to only unseen questions (skip study for review/mastered questions)
   const h = progress.getHistory(state.level);
   const seenSet = new Set(h.seen);
@@ -2313,6 +2321,31 @@ function startStudyPhase() {
   // Show study cards for unseen questions
   audio.play('quiz');
   showStudyCards(unseenCards, () => launchQuiz());
+}
+
+function showMasteredSkip() {
+  const overlay = document.getElementById('quizOverlay');
+  overlay.style.display = 'flex';
+  overlay.className = 'quiz-overlay';
+  const isLastWave = state.currentWaveIdx >= state.spec.waves.length - 1;
+  overlay.innerHTML = `
+    <div class="summary-big">🌟</div>
+    <div class="summary-title">All Mastered!</div>
+    <div class="summary-stats">You've answered every question correctly!<br>No quiz needed — bonus coins awarded!</div>
+    <div class="reward-line">+20💰 mastery bonus</div>
+    <button class="start-btn" id="continueBtn">${isLastWave ? 'FINISH LEVEL 🏆' : 'NEXT ROUND ▶️'}</button>
+  `;
+  document.getElementById('continueBtn').addEventListener('click', () => {
+    audio.play('click');
+    overlay.style.display = 'none'; overlay.innerHTML = '';
+    if (isLastWave) {
+      gameOver(true);
+    } else {
+      state.currentWaveIdx++;
+      updateHUD();
+      enterPrepPhase();
+    }
+  });
 }
 
 function showStudyCards(cards, onDone) {
