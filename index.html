@@ -1258,12 +1258,353 @@ const Q = {
     ],
   },
 };
+// ============== PROCEDURAL MATH GENERATOR ==============
+// Generates hundreds of unique math questions per grade to sustain 500 levels.
+// Uses a seeded approach so the same questions are always generated (stable IDs for spaced repetition).
+const _procMathCache = {};
+function getProceduralMath(lvl) {
+  if (_procMathCache[lvl]) return _procMathCache[lvl];
+  const qs = [];
+  const rng = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
+  const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
+  const wrongOpts = (correct, r, min=0, max=100) => {
+    const opts = new Set([correct]);
+    let tries = 0;
+    while (opts.size < 4 && tries < 50) {
+      let w = correct + Math.floor(r() * 7) - 3;
+      if (w < min) w = min + Math.floor(r() * 5);
+      if (w === correct) w = correct + (r() > 0.5 ? 1 : -1);
+      if (w >= min && w <= max) opts.add(w);
+      tries++;
+    }
+    while (opts.size < 4) opts.add(correct + opts.size);
+    const arr = [...opts].map(String);
+    // Shuffle but track correct index
+    const ci = arr.indexOf(String(correct));
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return { opts: arr, a: arr.indexOf(String(correct)) };
+  };
+
+  if (lvl === 'K2') {
+    const r = rng(42);
+    // Counting 1-10
+    const countEmojis = ['🍎','⭐','🌸','🐝','🎈','🍪','🐟','🦋'];
+    for (let i = 0; i < 20; i++) {
+      const n = 1 + Math.floor(r() * 10);
+      const e = pick(countEmojis, r);
+      const {opts, a} = wrongOpts(n, r, 1, 12);
+      qs.push({q:`Count: ${e.repeat(n)}`, opts, a, topic:"NEL · Counting", exp:`Count each one: ${n}! Point and count slowly.`});
+    }
+    // Addition within 10
+    for (let i = 0; i < 30; i++) {
+      const a1 = 1 + Math.floor(r() * 5), b1 = 1 + Math.floor(r() * (10 - a1));
+      const ans = a1 + b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 15);
+      qs.push({q:`${a1} + ${b1} = ?`, opts, a, topic:"NEL · Addition", exp:`Start at ${a1}, count ${b1} more: ${a1}… ${Array.from({length:b1},(_,j)=>a1+j+1).join(', ')}! = ${ans}`});
+    }
+    // Subtraction within 10
+    for (let i = 0; i < 25; i++) {
+      const a1 = 3 + Math.floor(r() * 8), b1 = 1 + Math.floor(r() * a1);
+      const ans = a1 - b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 12);
+      qs.push({q:`${a1} − ${b1} = ?`, opts, a, topic:"NEL · Subtraction", exp:`Start at ${a1}, take away ${b1}: ${a1}… ${Array.from({length:b1},(_,j)=>a1-j-1).join(', ')}! = ${ans}`});
+    }
+    // Number sequences
+    for (let i = 0; i < 15; i++) {
+      const start = 1 + Math.floor(r() * 5);
+      const pos = 2 + Math.floor(r() * 3);
+      const seq = Array.from({length:5}, (_,j) => start + j);
+      const ans = seq[pos];
+      seq[pos] = '?';
+      const {opts, a} = wrongOpts(ans, r, 1, 15);
+      qs.push({q:`Next: ${seq.join(',')}`, opts, a, topic:"NEL · Patterns", exp:`Count up by 1: the missing number is ${ans}!`});
+    }
+    // Comparing
+    for (let i = 0; i < 15; i++) {
+      const a1 = 1 + Math.floor(r() * 9), b1 = 1 + Math.floor(r() * 9);
+      if (a1 === b1) continue;
+      const bigger = Math.max(a1, b1);
+      qs.push({q:`Which is more: ${a1} or ${b1}?`, opts:[String(a1),String(b1),"same","?"], a: a1 > b1 ? 0 : 1, topic:"NEL · Comparing", exp:`${bigger} is more! On a number line, ${bigger} is further right.`});
+    }
+    // Shapes
+    const shapes = [{q:"How many sides on a ▢?",a:4,exp:"A square has 4 equal sides! □"},{q:"How many sides on a △?",a:3,exp:"A triangle has 3 sides: △"},{q:"How many corners on a △?",a:3,exp:"A triangle has 3 corners (vertices)!"},{q:"🔵 is a ___",opts:["square","circle","triangle","star"],a:1,exp:"A circle is round with no corners! ⭕"}];
+    for (const s of shapes) {
+      if (s.opts) { qs.push({...s, topic:"NEL · Shapes"}); }
+      else { const {opts, a} = wrongOpts(s.a, r, 1, 8); qs.push({q:s.q, opts, a, topic:"NEL · Shapes", exp:s.exp}); }
+    }
+  }
+
+  if (lvl === 'P1') {
+    const r = rng(123);
+    // Addition within 20
+    for (let i = 0; i < 40; i++) {
+      const a1 = 1 + Math.floor(r() * 15), b1 = 1 + Math.floor(r() * (20 - a1));
+      const ans = a1 + b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 30);
+      qs.push({q:`${a1} + ${b1} = ?`, opts, a, topic:"MPAH 1A · Addition", exp:`${a1} + ${b1} = ${ans}. Try making 10 first if the numbers are big!`});
+    }
+    // Addition within 40
+    for (let i = 0; i < 30; i++) {
+      const a1 = 10 + Math.floor(r() * 20), b1 = 1 + Math.floor(r() * (40 - a1));
+      const ans = a1 + b1;
+      const {opts, a} = wrongOpts(ans, r, 5, 50);
+      qs.push({q:`${a1} + ${b1} = ?`, opts, a, topic:"MPAH 1B · Addition within 40", exp:`${a1} + ${b1} = ${ans}. Add ones first, then tens!`});
+    }
+    // Subtraction within 20
+    for (let i = 0; i < 35; i++) {
+      const a1 = 5 + Math.floor(r() * 16), b1 = 1 + Math.floor(r() * a1);
+      const ans = a1 - b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 25);
+      qs.push({q:`${a1} − ${b1} = ?`, opts, a, topic:"MPAH 1A · Subtraction", exp:`${a1} − ${b1} = ${ans}. Count backwards from ${a1}!`});
+    }
+    // Subtraction within 40
+    for (let i = 0; i < 25; i++) {
+      const a1 = 15 + Math.floor(r() * 26), b1 = 1 + Math.floor(r() * Math.min(a1, 20));
+      const ans = a1 - b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 45);
+      qs.push({q:`${a1} − ${b1} = ?`, opts, a, topic:"MPAH 1B · Subtraction within 40", exp:`${a1} − ${b1} = ${ans}.`});
+    }
+    // Comparing
+    for (let i = 0; i < 20; i++) {
+      const a1 = 1 + Math.floor(r() * 30), b1 = 1 + Math.floor(r() * 30);
+      if (a1 === b1) continue;
+      const bigger = Math.max(a1, b1);
+      qs.push({q:`Bigger: ${a1} or ${b1}?`, opts:[String(a1),String(b1),"same","?"], a: a1 > b1 ? 0 : 1, topic:"MPAH 1A · Comparing", exp:`${bigger} is bigger!`});
+    }
+    // Patterns
+    for (let i = 0; i < 15; i++) {
+      const start = 1 + Math.floor(r() * 10);
+      const step = pick([1,2,5,10], r);
+      const pos = 2 + Math.floor(r() * 3);
+      const seq = Array.from({length:5}, (_,j) => start + j * step);
+      const ans = seq[pos];
+      seq[pos] = '?';
+      const {opts, a} = wrongOpts(ans, r, 0, 60);
+      qs.push({q:`${seq.join(', ')}`, opts, a, topic:"MPAH 1A · Patterns", exp:`Count by ${step}s: the answer is ${ans}!`});
+    }
+  }
+
+  if (lvl === 'P2') {
+    const r = rng(456);
+    // Addition within 100
+    for (let i = 0; i < 30; i++) {
+      const a1 = 10 + Math.floor(r() * 80), b1 = 1 + Math.floor(r() * (100 - a1));
+      const ans = a1 + b1;
+      const {opts, a} = wrongOpts(ans, r, 5, 120);
+      qs.push({q:`${a1} + ${b1} = ?`, opts, a, topic:"MPAH 2A · Addition", exp:`${a1} + ${b1} = ${ans}. Add ones, carry if needed, then add tens!`});
+    }
+    // Subtraction within 100
+    for (let i = 0; i < 25; i++) {
+      const a1 = 20 + Math.floor(r() * 80), b1 = 1 + Math.floor(r() * a1);
+      const ans = a1 - b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 100);
+      qs.push({q:`${a1} − ${b1} = ?`, opts, a, topic:"MPAH 2A · Subtraction", exp:`${a1} − ${b1} = ${ans}.`});
+    }
+    // Multiplication ×2 to ×10
+    for (const m of [2,3,4,5,10]) {
+      for (let i = 1; i <= 10; i++) {
+        const ans = m * i;
+        const {opts, a} = wrongOpts(ans, r, 0, m * 12);
+        qs.push({q:`${m} × ${i} = ?`, opts, a, topic:`MPAH 2A · ×${m} table`, exp:`${m} × ${i} = ${ans}. That's ${i} groups of ${m}!`});
+      }
+    }
+    // Money
+    for (let i = 0; i < 10; i++) {
+      const dollars = 1 + Math.floor(r() * 5);
+      const cents = dollars * 100;
+      const {opts, a} = wrongOpts(cents, r, 10, 600);
+      qs.push({q:`$${dollars} = ? cents`, opts, a, topic:"MPAH 2B · Money", exp:`$${dollars} = ${cents} cents. $1 = 100 cents! 💰`});
+    }
+    // Half of
+    for (let i = 0; i < 10; i++) {
+      const num = (2 + Math.floor(r() * 10)) * 2;
+      const ans = num / 2;
+      const {opts, a} = wrongOpts(ans, r, 0, 30);
+      qs.push({q:`Half of ${num} = ?`, opts, a, topic:"MPAH 2B · Fractions", exp:`Half of ${num} = ${num} ÷ 2 = ${ans}. Split into 2 equal groups! ½`});
+    }
+  }
+
+  if (lvl === 'P3') {
+    const r = rng(789);
+    // Multiplication ×6 to ×9
+    for (const m of [6,7,8,9]) {
+      for (let i = 1; i <= 10; i++) {
+        const ans = m * i;
+        const {opts, a} = wrongOpts(ans, r, 0, m * 12);
+        qs.push({q:`${m} × ${i} = ?`, opts, a, topic:`MPAH 3A · ×${m} table`, exp:`${m} × ${i} = ${ans}.`});
+      }
+    }
+    // Division
+    for (let i = 0; i < 30; i++) {
+      const d = 2 + Math.floor(r() * 8);
+      const q1 = 1 + Math.floor(r() * 10);
+      const num = d * q1;
+      const ans = q1;
+      const {opts, a} = wrongOpts(ans, r, 0, 20);
+      qs.push({q:`${num} ÷ ${d} = ?`, opts, a, topic:"MPAH 3A · Division", exp:`${num} ÷ ${d} = ${ans}. Think: ${d} × ? = ${num}. Answer: ${ans}!`});
+    }
+    // Fractions
+    for (let i = 0; i < 15; i++) {
+      const denom = pick([2,4], r);
+      const whole = (denom + Math.floor(r() * 5)) * denom;
+      const frac = denom === 2 ? '½' : '¼';
+      const ans = whole / denom;
+      const {opts, a} = wrongOpts(ans, r, 0, 40);
+      qs.push({q:`${frac} of ${whole} = ?`, opts, a, topic:"MPAH 3B · Fractions", exp:`${frac} of ${whole} = ${whole} ÷ ${denom} = ${ans}!`});
+    }
+    // Addition within 1000
+    for (let i = 0; i < 25; i++) {
+      const a1 = 100 + Math.floor(r() * 500), b1 = 10 + Math.floor(r() * (999 - a1));
+      const ans = a1 + b1;
+      const {opts, a} = wrongOpts(ans, r, 100, 1100);
+      qs.push({q:`${a1} + ${b1} = ?`, opts, a, topic:"MPAH 3A · Addition", exp:`${a1} + ${b1} = ${ans}. Add column by column!`});
+    }
+    // Perimeter
+    for (let i = 0; i < 10; i++) {
+      const side = 2 + Math.floor(r() * 12);
+      const ans = side * 4;
+      const {opts, a} = wrongOpts(ans, r, 4, 80);
+      qs.push({q:`Perimeter of square (side ${side})?`, opts, a, topic:"MPAH 3B · Perimeter", exp:`Square perimeter = 4 × side = 4 × ${side} = ${ans}! □`});
+    }
+    // 24-hour clock
+    for (let i = 0; i < 10; i++) {
+      const hr = 1 + Math.floor(r() * 11);
+      const min = Math.floor(r() * 4) * 15;
+      const hr24 = hr + 12;
+      const minStr = min === 0 ? '00' : String(min);
+      const {opts, a} = wrongOpts(hr24, r, 1, 24);
+      const optsFmt = opts.map(h => `${h}:${minStr}`);
+      qs.push({q:`${hr}:${minStr} PM in 24-hr?`, opts:optsFmt, a, topic:"MPAH 3B · 24-hr clock", exp:`PM: add 12 to the hour. ${hr} + 12 = ${hr24}. So ${hr}:${minStr} PM = ${hr24}:${minStr}! 🕐`});
+    }
+  }
+
+  _procMathCache[lvl] = qs;
+  return qs;
+}
+
+// ============== EXPANDED ENGLISH BANKS ==============
+const EXTRA_ENGLISH = {
+  K2: [
+    {q:"Starts with 'C':", opts:["ball","cat","dog","fish"], a:1, topic:"NEL · Beginning sounds", exp:"Cat starts with 'C' — cuh-at! 🐱"},
+    {q:"Starts with 'D':", opts:["cat","ball","dog","sun"], a:2, topic:"NEL · Beginning sounds", exp:"Dog starts with 'D' — duh-og! 🐕"},
+    {q:"Ends with 'T':", opts:["dog","sun","cat","hen"], a:2, topic:"NEL · Ending sounds", exp:"Cat ends with 'T' — ca-T! Listen to the last sound. 🐱"},
+    {q:"Which is an animal?", opts:["table","chair","bird","book"], a:2, topic:"NEL · Categories", exp:"A bird is an animal! Tables, chairs and books are objects. 🐦"},
+    {q:"Which is a fruit?", opts:["chair","banana","pencil","shoe"], a:1, topic:"NEL · Categories", exp:"A banana is a fruit! 🍌"},
+    {q:"We eat ___.", opts:["food","shoes","books","chairs"], a:0, topic:"NEL · Daily routine", exp:"We eat food! Breakfast, lunch, and dinner. 🍽️"},
+    {q:"Grass is ___.", opts:["red","blue","green","yellow"], a:2, topic:"NEL · Colours", exp:"Grass is green! 🌿"},
+    {q:"How many legs on a dog?", opts:["2","3","4","6"], a:2, topic:"NEL · Concepts", exp:"A dog has 4 legs! 🐕"},
+    {q:"Which letter comes after D?", opts:["C","E","F","B"], a:0, topic:"NEL · Alphabet", exp:"A, B, C, D, E! E comes after D. 🔤"},
+    {q:"Which letter comes after G?", opts:["F","H","I","E"], a:0, topic:"NEL · Alphabet", exp:"... F, G, H! H comes after G. 🔤"},
+  ],
+  P1: [
+    {q:"Spell: a place for books:", opts:["libary","library","liberry","libery"], a:1, topic:"STELLAR P1 · Spelling", exp:"L-I-B-R-A-R-Y spells library! 📚"},
+    {q:"They ___ happy.", opts:["is","am","are","be"], a:2, topic:"STELLAR P1 · Subject–verb", exp:"'They' uses 'are': They are happy. I am, you are, they are!"},
+    {q:"I ___ a student.", opts:["is","am","are","be"], a:1, topic:"STELLAR P1 · Subject–verb", exp:"'I' always uses 'am': I am a student. 🎒"},
+    {q:"Plural of DOG:", opts:["dogs","doges","dogies","doggs"], a:0, topic:"STELLAR P1 · Plurals", exp:"Just add 's': 1 dog → 2 dogs! 🐕🐕"},
+    {q:"Plural of BOX:", opts:["boxs","boxes","boxies","boxen"], a:1, topic:"STELLAR P1 · Plurals", exp:"Words ending in x/s/sh add '-es': box → boxes! 📦📦"},
+    {q:"Opposite of HOT:", opts:["warm","cold","cool","nice"], a:1, topic:"STELLAR P1 · Opposites", exp:"Hot and cold are opposites! 🔥❄️"},
+    {q:"Opposite of BIG:", opts:["large","small","tall","wide"], a:1, topic:"STELLAR P1 · Opposites", exp:"Big and small are opposites! 🐘🐜"},
+    {q:"Rhymes with HAT:", opts:["hit","hot","cat","hut"], a:2, topic:"STELLAR P1 · Phonics", exp:"HAT and CAT rhyme — they both end in '-at'! 🎩🐱"},
+    {q:"Rhymes with PIG:", opts:["big","peg","dog","bag"], a:0, topic:"STELLAR P1 · Phonics", exp:"PIG and BIG rhyme — they both end in '-ig'! 🐷"},
+    {q:"___ egg", opts:["a","an","the","is"], a:1, topic:"STELLAR P1 · Articles", exp:"Use 'an' before vowel sounds: an egg, an orange! 🥚"},
+  ],
+  P2: [
+    {q:"Past of JUMP:", opts:["jumps","jumped","jumping","jumpen"], a:1, topic:"STELLAR P2 · Past tense", exp:"Regular verbs add '-ed': jump → jumped! 🏃"},
+    {q:"Past of EAT:", opts:["eated","ate","eating","eat"], a:1, topic:"STELLAR P2 · Irregular past", exp:"EAT → ATE is irregular. No '-ed'! 🍽️"},
+    {q:"Past of GO:", opts:["goed","goes","went","going"], a:2, topic:"STELLAR P2 · Irregular past", exp:"GO → WENT is very irregular! Just memorise it. 🚶"},
+    {q:"The boy likes ___ dog.", opts:["her","his","their","our"], a:1, topic:"STELLAR P2 · Possessives", exp:"Boy = male, so 'his': The boy likes his dog. 👦🐕"},
+    {q:"Opposite of HAPPY:", opts:["glad","joyful","sad","good"], a:2, topic:"STELLAR P2 · Antonyms", exp:"Happy and sad are opposites! 😊😢"},
+    {q:"Opposite of FAST:", opts:["quick","rapid","slow","swift"], a:2, topic:"STELLAR P2 · Antonyms", exp:"Fast and slow are opposites! 🐇🐢"},
+    {q:"Synonym of SMALL:", opts:["big","tiny","tall","wide"], a:1, topic:"STELLAR P2 · Synonyms", exp:"Small and tiny mean the same thing! 🐜"},
+    {q:"She sings ___.", opts:["beautiful","beautifully","beauty","beautify"], a:1, topic:"STELLAR P2 · Adverbs", exp:"Adverbs describe HOW — add '-ly': beautiful → beautifully! 🎵"},
+    {q:"Plural of MOUSE:", opts:["mouses","mice","mousies","meese"], a:1, topic:"STELLAR P2 · Plurals", exp:"MOUSE → MICE is irregular. Like goose → geese! 🐭🐭"},
+    {q:"Plural of TOOTH:", opts:["tooths","teeth","toothes","teeths"], a:1, topic:"STELLAR P2 · Plurals", exp:"TOOTH → TEETH. The 'oo' changes to 'ee'! 🦷🦷"},
+  ],
+  P3: [
+    {q:"___ your homework.", opts:["Does","Do","Did","Done"], a:1, topic:"STELLAR P3 · Imperatives", exp:"Commands use the base verb: Do your homework! No 'does' or 'did'. 📝"},
+    {q:"Past of FLY:", opts:["flied","flew","flown","flying"], a:1, topic:"STELLAR P3 · Irregular past", exp:"FLY → FLEW. Another irregular verb to memorise! ✈️"},
+    {q:"Past of BREAK:", opts:["breaked","broke","broken","breaking"], a:1, topic:"STELLAR P3 · Irregular past", exp:"BREAK → BROKE. The vowel changes! 💔"},
+    {q:"___  raining outside.", opts:["Its","It's","Its'","Itss"], a:1, topic:"STELLAR P3 · Contractions", exp:"It's = it is. Its (no apostrophe) = belonging to it. It's raining! 🌧️"},
+    {q:"Prefix meaning 'not':", opts:["re-","un-","pre-","over-"], a:1, topic:"STELLAR P3 · Prefixes", exp:"un- means 'not': unhappy = not happy, unkind = not kind! 🚫"},
+    {q:"Prefix meaning 'again':", opts:["un-","re-","pre-","dis-"], a:1, topic:"STELLAR P3 · Prefixes", exp:"re- means 'again': redo = do again, replay = play again! 🔄"},
+    {q:"Suffix in 'teacher':", opts:["-er","-or","-ing","-ed"], a:0, topic:"STELLAR P3 · Suffixes", exp:"-er means 'one who does': teach → teacher, play → player! 👩‍🏫"},
+    {q:"Plural of WOLF:", opts:["wolfs","wolves","wolfes","wolvs"], a:1, topic:"STELLAR P3 · Plurals", exp:"Words ending in -f/-fe change to -ves: wolf → wolves! 🐺🐺"},
+    {q:"Homophone of THEIR:", opts:["there","they","them","this"], a:0, topic:"STELLAR P3 · Homophones", exp:"Their/there/they're all sound the same! Their = belonging to them. 🏠"},
+    {q:"Antonym of QUIET:", opts:["silent","noisy","calm","still"], a:1, topic:"STELLAR P3 · Antonyms", exp:"Quiet and noisy are opposites! 🤫📢"},
+  ],
+};
+
+// ============== EXPANDED CHINESE BANKS ==============
+const EXTRA_CHINESE = {
+  K2: [
+    {q:"sì is which number?", opts:["三","四","五","六"], a:1, topic:"NEL 华文 · 拼音", exp:"sì (4th tone) = 四 = 4! Be careful: sì (四) vs shí (十=10)! 4️⃣"},
+    {q:"wǔ means?", opts:["四","五","六","七"], a:1, topic:"NEL 华文 · 拼音", exp:"wǔ (3rd tone) = 五 = 5! Like one whole hand. 🖐️"},
+    {q:"lán is which color?", opts:["红","蓝","绿","黄"], a:1, topic:"NEL 华文 · 拼音", exp:"lán (2nd tone) = 蓝 = blue! 蓝天 = blue sky! 🔵"},
+    {q:"lǜ is which color?", opts:["红","蓝","绿","黄"], a:2, topic:"NEL 华文 · 拼音", exp:"lǜ (4th tone) = 绿 = green! 绿色 = green color! 🟢"},
+    {q:"huáng is which color?", opts:["红","蓝","绿","黄"], a:3, topic:"NEL 华文 · 拼音", exp:"huáng (2nd tone) = 黄 = yellow! 黄色 = yellow color! 🟡"},
+    {q:"🍌 is ___", opts:["苹果","香蕉","西瓜","橙子"], a:1, topic:"NEL 华文 · 水果", exp:"🍌 is 香蕉 (xiāng jiāo) = banana! 🍌"},
+    {q:"gē ge means?", opts:["older brother","younger brother","older sister","younger sister"], a:0, topic:"NEL 华文 · 家人", exp:"哥哥 (gē ge) = older brother! 哥 has two 可 stacked. 👦"},
+    {q:"jiě jie means?", opts:["older brother","younger brother","older sister","younger sister"], a:2, topic:"NEL 华文 · 家人", exp:"姐姐 (jiě jie) = older sister! 姐 has 女 (female) radical. 👧"},
+  ],
+  P1: [
+    {q:"mù means?", opts:["火","水","木","土"], a:2, topic:"HLHB 1A · 拼音", exp:"mù (4th tone) = 木 = wood/tree! The character looks like a tree! 🌳"},
+    {q:"tǔ means?", opts:["火","水","木","土"], a:3, topic:"HLHB 1A · 拼音", exp:"tǔ (3rd tone) = 土 = earth/soil! One of the five elements! 🌍"},
+    {q:"rén means?", opts:["人","大","天","上"], a:0, topic:"HLHB 1A · 拼音", exp:"rén (2nd tone) = 人 = person! The character looks like a walking person! 🚶"},
+    {q:"kǒu means?", opts:["口","目","耳","手"], a:0, topic:"HLHB 1A · 拼音", exp:"kǒu (3rd tone) = 口 = mouth! The character is a box — an open mouth! 👄"},
+    {q:"mù means?", opts:["口","目","耳","手"], a:1, topic:"HLHB 1A · 拼音", exp:"mù (4th tone) = 目 = eye! Same pronunciation as 木(tree) but different tone! 👁️"},
+    {q:"Opposite of 多:", opts:["少","大","高","长"], a:0, topic:"HLHB 1B · 反义词", exp:"多 (duō) = many, 少 (shǎo) = few. They're opposites! 📊"},
+    {q:"Opposite of 高:", opts:["大","低","长","远"], a:1, topic:"HLHB 1B · 反义词", exp:"高 (gāo) = tall/high, 低 (dī) = short/low. Opposites! 📏"},
+    {q:"Opposite of 来:", opts:["走","去","跑","停"], a:1, topic:"HLHB 1B · 反义词", exp:"来 (lái) = come, 去 (qù) = go. Come and go are opposites! 🔄"},
+  ],
+  P2: [
+    {q:"zuò yè means?", opts:["homework","classroom","textbook","exam"], a:0, topic:"HLHB 2A · 拼音", exp:"作业 (zuò yè) = homework! 作 = make, 业 = work. 📝"},
+    {q:"shū bāo means?", opts:["textbook","school bag","notebook","pencil"], a:1, topic:"HLHB 2A · 拼音", exp:"书包 (shū bāo) = school bag! 书 = book, 包 = bag. 🎒"},
+    {q:"yī shēng means?", opts:["teacher","student","doctor","nurse"], a:2, topic:"HLHB 2A · 拼音", exp:"医生 (yī shēng) = doctor! 医 = medicine, 生 = person. 👨‍⚕️"},
+    {q:"xǐ zǎo means?", opts:["eat","sleep","bathe","play"], a:2, topic:"HLHB 2A · 拼音", exp:"洗澡 (xǐ zǎo) = take a bath! 洗 = wash. 🛁"},
+    {q:"shuì jiào means?", opts:["eat","sleep","study","play"], a:1, topic:"HLHB 2A · 拼音", exp:"睡觉 (shuì jiào) = sleep! 睡 has 目(eye) — eyes closed! 😴"},
+    {q:"Classifier for 猫:", opts:["个","只","本","条"], a:1, topic:"HLHB 2B · 量词", exp:"只 (zhī) is for small animals: 一只猫 = one cat! 🐱"},
+    {q:"Classifier for 鱼:", opts:["个","只","本","条"], a:3, topic:"HLHB 2B · 量词", exp:"条 (tiáo) is for long/thin things: 一条鱼 = one fish! 🐟"},
+    {q:"Classifier for 花:", opts:["个","只","本","朵"], a:3, topic:"HLHB 2B · 量词", exp:"朵 (duǒ) is for flowers: 一朵花 = one flower! 🌸"},
+  ],
+  P3: [
+    {q:"nǔ lì means?", opts:["lazy","hardworking","clever","naughty"], a:1, topic:"HLHB 3A · 拼音", exp:"努力 (nǔ lì) = hardworking/effort! 加油! Keep trying! 💪"},
+    {q:"rè nào means?", opts:["quiet","lively/bustling","boring","cold"], a:1, topic:"HLHB 3A · 拼音", exp:"热闹 (rè nào) = lively/bustling! 热 = hot, 闹 = noisy. Like a market! 🎉"},
+    {q:"yùn dòng means?", opts:["study","sleep","exercise","eat"], a:2, topic:"HLHB 3A · 拼音", exp:"运动 (yùn dòng) = exercise/sports! 运 = move, 动 = action. 🏃"},
+    {q:"dòng wù means?", opts:["plant","animal","person","food"], a:1, topic:"HLHB 3A · 拼音", exp:"动物 (dòng wù) = animal! 动 = move, 物 = thing. Moving things! 🐾"},
+    {q:"zhí wù means?", opts:["animal","plant","person","food"], a:1, topic:"HLHB 3A · 拼音", exp:"植物 (zhí wù) = plant! 植 = grow/plant. 🌱"},
+    {q:"Opposite of 快:", opts:["慢","大","高","远"], a:0, topic:"HLHB 3A · 反义词", exp:"快 (kuài) = fast, 慢 (màn) = slow. Opposites! 🐇🐢"},
+    {q:"Opposite of 远:", opts:["快","慢","近","高"], a:2, topic:"HLHB 3A · 反义词", exp:"远 (yuǎn) = far, 近 (jìn) = near. Opposites! 📏"},
+    {q:"完成 means?", opts:["start","complete/finish","stop","continue"], a:1, topic:"HLHB 3A · 动词", exp:"完成 (wán chéng) = complete/finish! 完 = end, 成 = achieve. ✅"},
+  ],
+};
+
 function getQuestionPool(lvl, subj) {
-  // Tag each question with a stable _id so we can track history across rounds/levels.
   const tag = (arr, src) => arr.map((q, i) => ({...q, _id: `${src}_${i}`, _src: src}));
   if (subj === 'mixed') {
-    const l = Q[lvl];
-    return [...tag(l.math||[], 'math'), ...tag(l.english||[], 'english'), ...tag(l.chinese||[], 'chinese')];
+    const stat = Q[lvl] || {};
+    const proc = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3') ? getProceduralMath(lvl) : [];
+    const extraE = EXTRA_ENGLISH[lvl] || [];
+    const extraC = EXTRA_CHINESE[lvl] || [];
+    return [
+      ...tag(stat.math||[], 'math'), ...tag(proc, 'pm'),
+      ...tag(stat.english||[], 'english'), ...tag(extraE, 'ee'),
+      ...tag(stat.chinese||[], 'chinese'), ...tag(extraC, 'ec'),
+    ];
+  }
+  if (subj === 'math') {
+    const stat = Q[lvl]?.math || [];
+    const proc = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3') ? getProceduralMath(lvl) : [];
+    return [...tag(stat, 'math'), ...tag(proc, 'pm')];
+  }
+  if (subj === 'english') {
+    const stat = Q[lvl]?.english || [];
+    const extra = EXTRA_ENGLISH[lvl] || [];
+    return [...tag(stat, 'english'), ...tag(extra, 'ee')];
+  }
+  if (subj === 'chinese') {
+    const stat = Q[lvl]?.chinese || [];
+    const extra = EXTRA_CHINESE[lvl] || [];
+    return [...tag(stat, 'chinese'), ...tag(extra, 'ec')];
   }
   if (!Q[lvl] || !Q[lvl][subj]) return [];
   return tag(Q[lvl][subj], subj);
