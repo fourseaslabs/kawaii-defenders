@@ -3941,25 +3941,32 @@ function buildTowerBar() {
   const bar = document.getElementById('towerBar');
   bar.innerHTML = '';
   const keys = ownedTowerKeys();
-  // When we exceed 8 towers, allow horizontal scroll so icons stay tappable.
+  // Reset any inline styles that previous rebuilds may have set.
+  bar.style.overflowX = '';
+  bar.style.justifyContent = '';
+  bar.style.paddingLeft = '';
+  bar.style.paddingRight = '';
+  bar.style.flexWrap = '';
+  bar.style.rowGap = '';
+  // When >8 towers, wrap to a second row so chips keep a uniform, tappable
+  // size instead of getting squeezed into one row. CSS already has flex-wrap
+  // available; we just need to enable it.
   if (keys.length > 8) {
-    bar.style.overflowX = 'auto';
-    bar.style.justifyContent = 'flex-start';
-    bar.style.paddingLeft = '4px';
-    bar.style.paddingRight = '4px';
-  } else {
-    bar.style.overflowX = '';
-    bar.style.justifyContent = '';
+    bar.style.flexWrap = 'wrap';
+    bar.style.rowGap = '5px';
   }
+  // Compute chips per row so rows have balanced counts (e.g. 11 → 6+5, not 8+3).
+  const chipsPerRow = keys.length <= 8 ? keys.length : Math.ceil(keys.length / 2);
+  // Each chip gets a percentage basis so all chips in a row are equal width.
+  // Subtract a little for gap spacing; flex-basis handles the rest.
+  const basisPct = (100 / chipsPerRow).toFixed(2) + '%';
   for (const key of keys) {
     const spec = towerSpec(key, 0);
     const chip = document.createElement('div');
     chip.className = 'tower-chip'; chip.dataset.key = key;
-    // Bigger chips when scrolling (no flex:1 squeeze), fixed-ish width.
-    if (keys.length > 8) {
-      chip.style.flex = '0 0 auto';
-      chip.style.minWidth = '56px';
-    }
+    // Equal-width flex-basis with small shrink to account for gap.
+    chip.style.flex = `1 1 ${basisPct}`;
+    chip.style.maxWidth = `calc(${basisPct} - 5px)`;
     chip.innerHTML = `<span class="emoji">${spec.emoji}</span><div class="cost">💰${spec.cost}</div>`;
     chip.addEventListener('click', () => {
       if (state.phase !== 'prep') { audio.play('invalid'); flashHint('Prep phase only!'); return; }
