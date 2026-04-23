@@ -2872,16 +2872,21 @@ function isBossLevel(n) { return n >= 5 && n % 5 === 0; }
 function getLevelSpec(n) {
   const isBoss = isBossLevel(n);
   if (isBoss) {
-    // Boss round: blank map, user builds maze — single big wave
+    // Boss round: blank map, user builds maze, 25 rounds of progressive minions.
+    const bossWaves = generateBossWaves(n);
     return {
       n, isBoss: true,
       variant: -1,
       entry: {col:0, row:0},
       exit: {col:6, row:7},
-      waves: generateBossWaves(n),
+      waves: bossWaves,
       startCoins: Math.min(280, 110 + Math.floor(n/5) * 12),
       lives: 5,
-      questionsPerWave: [Math.min(5, 3 + Math.floor(n/100))],
+      questionsPerWave: bossWaves.map((_, i) => {
+        const isLast = i === bossWaves.length - 1;
+        const base = Math.min(2, 1 + Math.floor(n / 30));
+        return isLast ? Math.min(5, base + 2) : base;  // boss final gets extra quiz weight
+      }),
     };
   }
   // Map variant stays the same for 3 consecutive levels (map mastery).
@@ -2943,17 +2948,36 @@ function generateWaves(n) {
 }
 
 function generateBossWaves(n) {
+  // Boss levels: 25 rounds of progressive minions, with the boss appearing
+  // alongside the minions in the FINAL round (round 25). Players build a maze
+  // over the first 24 rounds so the boss walks into a fully-built defense.
+  const numWaves = 25;
   const bossIdx = Math.min(BOSS_TYPES.length - 1, Math.floor(n / 5) - 1);
   const bossHpBoost = Math.floor(n / 5) * 8;
-  const minionCount = 10 + Math.floor(n / 5);
-  const minions = [];
-  const minionPool = [0,1,3,4];
-  if (n >= 20) minionPool.push(2, 5);
-  for (let i = 0; i < minionCount; i++) {
-    minions.push({ type: minionPool[i % minionPool.length], delay: Math.max(350, 550 - n * 2), hpBoost: Math.floor(n/5), boss:false });
+  const waves = [];
+  for (let w = 0; w < numWaves; w++) {
+    // Minion count ramps up each round
+    const baseCount = 6 + Math.floor(n / 8) + Math.floor(w * 1.2);
+    const count = Math.min(35, baseCount);
+    // Pool widens as rounds progress
+    const pool = [0, 1, 3, 4]; // troll, goblin, bat, ghostie — always in
+    if (n >= 10 || w >= 4) pool.push(2);  // spider
+    if (n >= 15 || w >= 6) pool.push(5);  // skelly
+    const enemies = [];
+    for (let i = 0; i < count; i++) {
+      enemies.push({
+        type: pool[Math.floor(Math.random() * pool.length)],
+        delay: Math.max(300, 550 + Math.random() * 200 - Math.min(300, n * 3 + w * 12)),
+        hpBoost: Math.floor(n / 5) * 2 + Math.floor(w * 2),
+      });
+    }
+    // Final round: add the boss at the end
+    if (w === numWaves - 1) {
+      enemies.push({ boss: true, bossIdx, delay: 1400, hpBoost: bossHpBoost });
+    }
+    waves.push({ enemies });
   }
-  const bossEnemy = { boss: true, bossIdx, delay: 1200, hpBoost: bossHpBoost };
-  return [{ enemies: [...minions, bossEnemy] }];
+  return waves;
 }
 
 // ============== PATHFINDING (for boss rounds) ==============
@@ -3979,7 +4003,11 @@ function enterPrepPhase() {
   const totalRounds = state.spec.waves.length;
   const roundNum = state.currentWaveIdx + 1;
   const label = state.spec.isBoss
-    ? '👹 BOSS · Build your maze!'
+    ? (state.currentWaveIdx === 0
+        ? '👹 BOSS LEVEL · Build your maze!'
+        : (state.currentWaveIdx === totalRounds - 1
+            ? `👹 FINAL ROUND ${roundNum}/${totalRounds} · Boss incoming!`
+            : `🧱 BOSS · Round ${roundNum} of ${totalRounds} · Strengthen your maze`))
     : (state.currentWaveIdx === 0
         ? `🧱 PREP · Round 1 of ${totalRounds}`
         : `🧱 PREP · Round ${roundNum} of ${totalRounds} · More towers?`);
@@ -3989,7 +4017,9 @@ function enterPrepPhase() {
   updateTowerBar();
   audio.setTempo(1.0);
   if (state.spec.isBoss && state.currentWaveIdx === 0) {
-    flashHint('Build a maze — enemies must still reach the exit! 🌀');
+    flashHint('Build a maze — enemies must still reach the exit! Boss arrives at round 25. 🌀');
+  } else if (state.spec.isBoss && state.currentWaveIdx === totalRounds - 1) {
+    flashHint('Final round! The boss is here — make sure your maze is ready. 👹');
   } else if (state.currentWaveIdx === 0) {
     flashHint(`This map has ${totalRounds} rounds. Place towers, then SEND WAVE!`);
   } else {
@@ -4417,7 +4447,7 @@ function showLevelStartModal(onStart) {
       ${stage ? `<div style="font-family:'Fredoka',sans-serif;font-size:14px;color:#6B4FA0;font-weight:700;margin:6px 0;">${stage.name}</div><div style="font-family:'Fredoka',sans-serif;font-size:12px;color:#7A6A7C;margin-bottom:8px;">${stage.desc}</div>` : ''}
       <div class="info">
         ${s.isBoss
-          ? `Build a maze of towers to slow the monsters!<br>You <b>can't fully block</b> the path.<br>🌊 ${s.waves.length} round · 💰${s.startCoins} · ❤️${s.lives}`
+          ? `Build a maze of towers to slow the monsters!<br>You <b>can't fully block</b> the path.<br>🌊 <b>${s.waves.length} rounds</b> — boss arrives in the final round · 💰${s.startCoins} · ❤️${s.lives}`
           : `<b>${s.waves.length} rounds</b> on this map — add more towers between each round!<br>💰${s.startCoins} to start · ❤️${s.lives} lives`
         }
       </div>
