@@ -4,6 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kawaii Defenders Academy</title>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCtM6AK2iYb6Du2UABmVcvT8TcQ8wDVMH0",
+    authDomain: "kawaii-defenders.firebaseapp.com",
+    projectId: "kawaii-defenders",
+    storageBucket: "kawaii-defenders.firebasestorage.app",
+    messagingSenderId: "69183312860",
+    appId: "1:69183312860:web:d578d7bb80f4d0f01e7519",
+    measurementId: "G-N402QMRJHE"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const fbAuth = getAuth(fbApp);
+  const fbDb = getFirestore(fbApp);
+
+  // Expose to global scope for use by non-module game script
+  window.fbAuth = fbAuth;
+  window.fbDb = fbDb;
+  window.fbSignIn = (email, pass) => signInWithEmailAndPassword(fbAuth, email, pass);
+  window.fbSignUp = (email, pass) => createUserWithEmailAndPassword(fbAuth, email, pass);
+  window.fbSignOut = () => signOut(fbAuth);
+  window.fbUpdateProfile = (user, data) => updateProfile(user, data);
+  window.fbDoc = doc;
+  window.fbGetDoc = getDoc;
+  window.fbSetDoc = setDoc;
+  window.fbOnAuthStateChanged = (cb) => onAuthStateChanged(fbAuth, cb);
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -506,6 +537,52 @@ body::before {
   80%{opacity:1; transform:translate(-50%, -30px) scale(1);}
   100%{opacity:0; transform:translate(-50%, -70px) scale(1);}
 }
+/* Auth UI */
+.auth-btn { position:fixed; top:12px; right:12px; z-index:200;
+  background:white; border:3px solid var(--ink); border-radius:999px; padding:6px 14px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:13px; cursor:pointer;
+  box-shadow:0 3px 0 var(--ink); display:flex; align-items:center; gap:6px;
+  transition:transform 0.1s; color:var(--ink); }
+.auth-btn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+.auth-btn .avatar { width:22px; height:22px; border-radius:50%; background:var(--lavender);
+  display:flex; align-items:center; justify-content:center; font-size:12px; border:2px solid var(--ink); }
+.auth-modal { position:fixed; inset:0; z-index:300; background:rgba(61,46,63,0.5);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+.auth-card { background:white; border:4px solid var(--ink); border-radius:26px;
+  padding:24px 20px; box-shadow:0 7px 0 var(--ink); max-width:340px; width:100%;
+  animation:popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.auth-card h2 { font-family:'Fredoka',sans-serif; font-size:24px; font-weight:700;
+  text-align:center; margin-bottom:4px; color:var(--ink); }
+.auth-card .auth-sub { font-family:'Fredoka',sans-serif; font-size:12px; color:#7A6A7C;
+  text-align:center; margin-bottom:16px; }
+.auth-card input { width:100%; padding:10px 14px; border:3px solid var(--ink); border-radius:14px;
+  font-family:'Fredoka',sans-serif; font-size:15px; font-weight:500; margin-bottom:10px;
+  box-sizing:border-box; outline:none; transition:border-color 0.2s; }
+.auth-card input:focus { border-color:var(--lavender); }
+.auth-card .auth-submit { width:100%; padding:12px; border:4px solid var(--ink); border-radius:16px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:17px; cursor:pointer;
+  box-shadow:0 4px 0 var(--ink); background:var(--mint); color:var(--ink);
+  transition:transform 0.1s, box-shadow 0.1s; margin-top:4px; }
+.auth-card .auth-submit:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.auth-card .auth-toggle { font-family:'Fredoka',sans-serif; font-size:13px; color:#6B4FA0;
+  text-align:center; margin-top:12px; cursor:pointer; font-weight:600; }
+.auth-card .auth-toggle:hover { text-decoration:underline; }
+.auth-card .auth-error { font-family:'Fredoka',sans-serif; font-size:12px; color:#D14D6A;
+  text-align:center; margin-top:8px; font-weight:600; min-height:18px; }
+.auth-card .auth-close { position:absolute; top:12px; right:16px; font-size:20px; cursor:pointer;
+  color:#7A6A7C; font-weight:700; line-height:1; }
+.auth-user-info { text-align:center; }
+.auth-user-info .user-avatar { font-size:48px; margin-bottom:4px; }
+.auth-user-info .user-name { font-family:'Fredoka',sans-serif; font-weight:700; font-size:20px; color:var(--ink); }
+.auth-user-info .user-email { font-family:'Fredoka',sans-serif; font-size:12px; color:#7A6A7C; margin-bottom:14px; }
+.auth-user-info .sync-status { font-family:'Fredoka',sans-serif; font-size:11px; color:#2B9B63;
+  background:#E8F5E9; border:2px solid #A8E6CF; border-radius:999px; padding:4px 12px;
+  display:inline-block; margin-bottom:14px; font-weight:600; }
+.auth-signout { width:100%; padding:10px; border:3px solid var(--ink); border-radius:14px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; cursor:pointer;
+  box-shadow:0 3px 0 var(--ink); background:#FFD6D6; color:var(--ink); margin-top:8px; }
+.auth-signout:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
 </style>
 </head>
 <body>
@@ -580,6 +657,14 @@ body::before {
 
   <!-- Level start/end modal -->
   <div class="level-start" id="levelStartModal" style="display:none;"></div>
+
+  <!-- Auth button (always visible) -->
+  <button class="auth-btn" id="authBtn" onclick="showAuthModal()">
+    <span class="avatar">👤</span> <span id="authBtnText">Sign In</span>
+  </button>
+
+  <!-- Auth modal -->
+  <div class="auth-modal" id="authModal" style="display:none;"></div>
 </div>
 
 <script>
@@ -1858,14 +1943,16 @@ function bfsPath(start, end, isBlocked) {
   return null;
 }
 
-// ============== PROGRESS (localStorage for persistence) ==============
+// ============== PROGRESS (localStorage + Firebase cloud sync) ==============
 const progress = {
   data: null,
   _loaded: false,
+  _uid: null, // Firebase user ID when logged in
   async load() {
     if (this._loaded) return;
     this._loaded = true;
     this.data = this._default();
+    // Always load localStorage first (instant)
     try {
       const raw = localStorage.getItem('kd_progress_v1');
       if (raw) {
@@ -1873,11 +1960,74 @@ const progress = {
         this.data = {...this._default(), ...parsed};
       }
     } catch(e) {}
+    // If logged in, merge cloud data on top
+    if (this._uid) await this._pullCloud();
   },
   async save() {
     try {
       localStorage.setItem('kd_progress_v1', JSON.stringify(this.data));
     } catch(e) {}
+    // Push to cloud if logged in (fire-and-forget)
+    if (this._uid) this._pushCloud();
+  },
+  async _pullCloud() {
+    try {
+      if (!window.fbDb || !this._uid) return;
+      const ref = window.fbDoc(window.fbDb, 'progress', this._uid);
+      const snap = await window.fbGetDoc(ref);
+      if (snap.exists()) {
+        const cloud = snap.data().data || {};
+        // Merge: take the higher unlocked level and union of history for each key
+        this.data = this._merge(this.data, cloud);
+        localStorage.setItem('kd_progress_v1', JSON.stringify(this.data));
+      }
+    } catch(e) { console.warn('Cloud pull failed:', e); }
+  },
+  async _pushCloud() {
+    try {
+      if (!window.fbDb || !this._uid) return;
+      const ref = window.fbDoc(window.fbDb, 'progress', this._uid);
+      await window.fbSetDoc(ref, { data: this.data, updatedAt: Date.now() }, { merge: true });
+    } catch(e) { console.warn('Cloud push failed:', e); }
+  },
+  _merge(local, cloud) {
+    const merged = {...this._default(), ...local};
+    for (const k of Object.keys(cloud)) {
+      if (!merged[k]) { merged[k] = cloud[k]; continue; }
+      // Merge unlocked/stars (level progress)
+      if (cloud[k].unlocked != null) {
+        if (!merged[k].unlocked) merged[k] = cloud[k];
+        else {
+          merged[k].unlocked = Math.max(merged[k].unlocked || 1, cloud[k].unlocked || 1);
+          const ms = merged[k].stars || {}, cs = cloud[k].stars || {};
+          for (const s of Object.keys(cs)) ms[s] = Math.max(ms[s] || 0, cs[s] || 0);
+          merged[k].stars = ms;
+        }
+      }
+      // Merge history (seen/mistakes)
+      if (cloud[k].seen) {
+        const ls = new Set(merged[k].seen || []);
+        for (const id of cloud[k].seen) ls.add(id);
+        merged[k].seen = [...ls];
+      }
+      if (cloud[k].mistakes) {
+        const lm = new Set(merged[k].mistakes || []);
+        for (const id of cloud[k].mistakes) lm.add(id);
+        // Remove from mistakes if it's been seen (mastered) in the other source
+        const seenSet = new Set(merged[k].seen || []);
+        // Keep mistakes that are STILL in both — if cloud has it mastered, remove
+        merged[k].mistakes = [...lm];
+      }
+    }
+    return merged;
+  },
+  async setUser(uid) {
+    this._uid = uid;
+    if (uid) {
+      await this._pullCloud();
+      // Push local data to cloud (in case guest had progress)
+      await this._pushCloud();
+    }
   },
   key(lvl, subj) { return `${state.mode}_${lvl}_${subj}`; },
   getUnlocked(lvl, subj) { return (this.data && this.data[this.key(lvl,subj)]?.unlocked) || 1; },
@@ -3385,6 +3535,125 @@ sfxBtn.addEventListener('click', () => {
 });
 
 resize();
+
+// ============== AUTH UI ==============
+function showAuthModal() {
+  const modal = document.getElementById('authModal');
+  const user = window.fbAuth?.currentUser;
+  if (user) {
+    const name = user.displayName || user.email.split('@')[0];
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="auth-card" style="position:relative;">
+        <span class="auth-close" onclick="closeAuthModal()">✕</span>
+        <div class="auth-user-info">
+          <div class="user-avatar">🌟</div>
+          <div class="user-name">${name}</div>
+          <div class="user-email">${user.email}</div>
+          <div class="sync-status">☁️ Progress synced to cloud</div>
+        </div>
+        <button class="auth-signout" onclick="doSignOut()">Sign Out</button>
+      </div>
+    `;
+  } else {
+    showAuthForm('login');
+  }
+}
+
+function showAuthForm(mode) {
+  const modal = document.getElementById('authModal');
+  modal.style.display = 'flex';
+  const isLogin = mode === 'login';
+  modal.innerHTML = `
+    <div class="auth-card" style="position:relative;">
+      <span class="auth-close" onclick="closeAuthModal()">✕</span>
+      <h2>${isLogin ? '🔑 Sign In' : '✨ Create Account'}</h2>
+      <div class="auth-sub">${isLogin ? 'Welcome back! Your progress syncs across devices.' : 'Save your progress to the cloud!'}</div>
+      ${!isLogin ? '<input type="text" id="authName" placeholder="Your name" autocomplete="name">' : ''}
+      <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
+      <input type="password" id="authPass" placeholder="Password" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
+      <button class="auth-submit" onclick="doAuth('${mode}')">${isLogin ? 'Sign In' : 'Create Account'}</button>
+      <div class="auth-toggle" onclick="showAuthForm('${isLogin ? 'signup' : 'login'}')">${isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}</div>
+      <div class="auth-error" id="authError"></div>
+    </div>
+  `;
+  setTimeout(() => {
+    const first = modal.querySelector(isLogin ? '#authEmail' : '#authName');
+    if (first) first.focus();
+  }, 100);
+  modal.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(mode); });
+  });
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').style.display = 'none';
+  document.getElementById('authModal').innerHTML = '';
+}
+
+async function doAuth(mode) {
+  const email = document.getElementById('authEmail')?.value?.trim();
+  const pass = document.getElementById('authPass')?.value;
+  const errEl = document.getElementById('authError');
+  if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+  errEl.textContent = '...';
+  try {
+    if (mode === 'login') {
+      await window.fbSignIn(email, pass);
+    } else {
+      const name = document.getElementById('authName')?.value?.trim() || email.split('@')[0];
+      const cred = await window.fbSignUp(email, pass);
+      await window.fbUpdateProfile(cred.user, { displayName: name });
+    }
+    closeAuthModal();
+  } catch(e) {
+    const msg = {
+      'auth/email-already-in-use': 'Email already registered. Try signing in!',
+      'auth/invalid-email': 'Invalid email address',
+      'auth/weak-password': 'Password must be at least 6 characters',
+      'auth/invalid-credential': 'Wrong email or password',
+      'auth/user-not-found': 'No account found. Try signing up!',
+      'auth/wrong-password': 'Wrong password',
+      'auth/too-many-requests': 'Too many attempts. Try again later',
+    }[e.code] || e.message || 'Something went wrong';
+    errEl.textContent = msg;
+  }
+}
+
+async function doSignOut() {
+  await window.fbSignOut();
+  progress._uid = null;
+  closeAuthModal();
+  updateAuthButton(null);
+}
+
+function updateAuthButton(user) {
+  const btn = document.getElementById('authBtn');
+  const text = document.getElementById('authBtnText');
+  if (user) {
+    const name = user.displayName || user.email.split('@')[0];
+    btn.querySelector('.avatar').textContent = name.charAt(0).toUpperCase();
+    text.textContent = name;
+  } else {
+    btn.querySelector('.avatar').textContent = '👤';
+    text.textContent = 'Sign In';
+  }
+}
+
+function initAuth() {
+  if (!window.fbOnAuthStateChanged) { setTimeout(initAuth, 500); return; }
+  window.fbOnAuthStateChanged(async (user) => {
+    updateAuthButton(user);
+    if (user) {
+      await progress.setUser(user.uid);
+    } else {
+      progress._uid = null;
+    }
+  });
+}
+setTimeout(initAuth, 300);
+
 progress.load();
 </script>
 </body>
