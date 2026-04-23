@@ -609,7 +609,36 @@ body::before {
   <div class="tower-bar" id="towerBar" style="display:none;"></div>
 
   <!-- Mode selection (first screen) -->
-  <div class="screen" id="modeScreen">
+  <!-- Welcome / Auth screen (FIRST PAGE) -->
+  <div class="screen" id="welcomeScreen">
+    <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
+    <div class="title">Kawaii<br>Defenders</div>
+    <div class="subtitle">Learn while you defend! 🎓🏰</div>
+    <div id="welcomeAuthArea" style="width:100%;max-width:340px;margin-top:12px;">
+      <div class="label" style="text-align:center;">Sign in to save your progress</div>
+      <input type="email" id="welcomeEmail" placeholder="Email" autocomplete="email" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+      <input type="password" id="welcomePass" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+      <div id="welcomeNameRow" style="display:none;">
+        <input type="text" id="welcomeName" placeholder="Your name" autocomplete="name" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+      </div>
+      <button class="start-btn" id="welcomeSubmitBtn" style="width:100%;margin-bottom:8px;" onclick="doWelcomeAuth()">Sign In ✨</button>
+      <div id="welcomeToggle" class="auth-toggle" onclick="toggleWelcomeMode()">Don't have an account? Sign up</div>
+      <div class="auth-error" id="welcomeError"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <div class="secondary-btn" style="display:inline-block;cursor:pointer;" onclick="skipToModeScreen()">Continue as Guest →</div>
+      </div>
+    </div>
+    <!-- Shown when user is already logged in (auto-detected) -->
+    <div id="welcomeLoggedIn" style="display:none;text-align:center;margin-top:16px;">
+      <div style="font-family:'Fredoka',sans-serif;font-size:16px;font-weight:600;color:var(--ink);margin-bottom:8px;">Welcome back, <span id="welcomeUserName"></span>! 🌟</div>
+      <button class="start-btn" onclick="skipToModeScreen()">PLAY ✨</button>
+      <div style="margin-top:12px;">
+        <div class="secondary-btn" style="display:inline-block;cursor:pointer;" onclick="doSignOut();document.getElementById('welcomeLoggedIn').style.display='none';document.getElementById('welcomeAuthArea').style.display='block';">Sign Out</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen hidden" id="modeScreen">
     <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
     <div class="title">Kawaii<br>Defenders</div>
     <div class="subtitle">Learn while you defend! 🎓🏰</div>
@@ -659,7 +688,7 @@ body::before {
   <div class="level-start" id="levelStartModal" style="display:none;"></div>
 
   <!-- Auth button (always visible) -->
-  <button class="auth-btn" id="authBtn" onclick="showAuthModal()">
+  <button class="auth-btn" id="authBtn" onclick="showAuthModal()" style="display:none;">
     <span class="avatar">👤</span> <span id="authBtnText">Sign In</span>
   </button>
 
@@ -3322,6 +3351,7 @@ function renderJourneyMap(unlocked) {
 function showStartScreen() {
   state.screen = 'start';
   hideGameplayUI();
+  document.getElementById('welcomeScreen').classList.add('hidden');
   document.getElementById('modeScreen').classList.add('hidden');
   document.getElementById('startScreen').classList.remove('hidden');
   document.getElementById('journeyScreen').classList.add('hidden');
@@ -3329,6 +3359,7 @@ function showStartScreen() {
 function showModeScreen() {
   state.screen = 'mode';
   hideGameplayUI();
+  document.getElementById('welcomeScreen').classList.add('hidden');
   document.getElementById('modeScreen').classList.remove('hidden');
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('journeyScreen').classList.add('hidden');
@@ -3536,7 +3567,62 @@ sfxBtn.addEventListener('click', () => {
 
 resize();
 
-// ============== AUTH UI ==============
+// ============== WELCOME SCREEN AUTH ==============
+let _welcomeMode = 'login'; // 'login' or 'signup'
+
+function toggleWelcomeMode() {
+  _welcomeMode = _welcomeMode === 'login' ? 'signup' : 'login';
+  const isLogin = _welcomeMode === 'login';
+  document.getElementById('welcomeNameRow').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('welcomeSubmitBtn').textContent = isLogin ? 'Sign In ✨' : 'Create Account ✨';
+  document.getElementById('welcomeToggle').textContent = isLogin
+    ? "Don't have an account? Sign up"
+    : 'Already have an account? Sign in';
+  document.getElementById('welcomeError').textContent = '';
+}
+
+async function doWelcomeAuth() {
+  const email = document.getElementById('welcomeEmail')?.value?.trim();
+  const pass = document.getElementById('welcomePass')?.value;
+  const errEl = document.getElementById('welcomeError');
+  if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+  errEl.textContent = '...';
+  try {
+    if (_welcomeMode === 'login') {
+      await window.fbSignIn(email, pass);
+    } else {
+      const name = document.getElementById('welcomeName')?.value?.trim() || email.split('@')[0];
+      const cred = await window.fbSignUp(email, pass);
+      await window.fbUpdateProfile(cred.user, { displayName: name });
+    }
+    // Auth state listener will handle the transition
+  } catch(e) {
+    const msg = {
+      'auth/email-already-in-use': 'Email already registered. Try signing in!',
+      'auth/invalid-email': 'Invalid email address',
+      'auth/weak-password': 'Password must be at least 6 characters',
+      'auth/invalid-credential': 'Wrong email or password',
+      'auth/user-not-found': 'No account found. Try signing up!',
+      'auth/wrong-password': 'Wrong password',
+      'auth/too-many-requests': 'Too many attempts. Try again later',
+    }[e.code] || e.message || 'Something went wrong';
+    errEl.textContent = msg;
+  }
+}
+
+function skipToModeScreen() {
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('modeScreen').classList.remove('hidden');
+  document.getElementById('authBtn').style.display = 'flex';
+}
+
+// Enter key on welcome inputs
+document.querySelectorAll('#welcomeAuthArea input').forEach(inp => {
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') doWelcomeAuth(); });
+});
+
+// ============== AUTH UI (in-game modal) ==============
 function showAuthModal() {
   const modal = document.getElementById('authModal');
   const user = window.fbAuth?.currentUser;
@@ -3647,6 +3733,14 @@ function initAuth() {
     updateAuthButton(user);
     if (user) {
       await progress.setUser(user.uid);
+      // If still on welcome screen, show "welcome back" UI
+      const ws = document.getElementById('welcomeScreen');
+      if (ws && !ws.classList.contains('hidden')) {
+        const name = user.displayName || user.email.split('@')[0];
+        document.getElementById('welcomeAuthArea').style.display = 'none';
+        document.getElementById('welcomeLoggedIn').style.display = 'block';
+        document.getElementById('welcomeUserName').textContent = name;
+      }
     } else {
       progress._uid = null;
     }
