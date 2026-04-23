@@ -98,17 +98,17 @@ body::before {
 
 /* Tower bar */
 .tower-bar { position:absolute; bottom:10px; left:8px; right:8px;
-  background:white; border:3px solid var(--ink); border-radius:18px; padding:6px;
-  box-shadow:0 4px 0 var(--ink); display:flex; gap:4px; z-index:10;
+  background:white; border:3px solid var(--ink); border-radius:20px; padding:8px 6px;
+  box-shadow:0 4px 0 var(--ink); display:flex; gap:5px; z-index:10;
   justify-content:space-around; align-items:center; }
-.tower-chip { flex:1; background:var(--cream); border:2px solid var(--ink); border-radius:11px;
-  padding:4px 1px 3px; text-align:center; cursor:pointer; font-family:'Fredoka',sans-serif;
+.tower-chip { flex:1; background:var(--cream); border:2px solid var(--ink); border-radius:13px;
+  padding:7px 2px 5px; text-align:center; cursor:pointer; font-family:'Fredoka',sans-serif;
   transition:transform 0.15s, background 0.15s, box-shadow 0.15s; position:relative; min-width:0; }
 .tower-chip:active { transform:scale(0.94); }
 .tower-chip.selected { background:var(--sun); transform:translateY(-3px); box-shadow:0 3px 0 var(--ink); }
 .tower-chip.disabled { opacity:0.45; }
-.tower-chip .emoji { font-size:18px; display:block; line-height:1; }
-.tower-chip .cost { font-size:9px; color:#A87400; font-weight:700; margin-top:1px; }
+.tower-chip .emoji { font-size:26px; display:block; line-height:1; }
+.tower-chip .cost { font-size:10px; color:#A87400; font-weight:700; margin-top:2px; }
 
 /* Tower upgrade popup */
 .tower-popup { position:absolute; inset:0; background:rgba(61,46,63,0.4);
@@ -261,6 +261,26 @@ body::before {
 .bonus-line { font-family:'Fredoka',sans-serif; font-weight:700; font-size:18px; color:#2B9B63;
   margin:4px 0 16px; animation:bonusPulse 0.8s ease infinite; }
 @keyframes bonusPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+
+/* Boss reward picker */
+.reward-title { font-family:'Fredoka',sans-serif; font-weight:700; font-size:26px;
+  text-align:center; color:var(--ink); text-shadow:3px 3px 0 var(--sun); margin-bottom:6px; }
+.reward-sub { font-family:'Fredoka',sans-serif; font-size:13px; color:#7A6A7C;
+  text-align:center; margin-bottom:14px; }
+.reward-options { display:flex; flex-direction:column; gap:10px; width:100%; max-width:340px; }
+.reward-btn { background:white; border:3px solid var(--ink); border-radius:16px;
+  padding:12px 14px; cursor:pointer; box-shadow:0 4px 0 var(--ink);
+  font-family:'Nunito',sans-serif; display:flex; align-items:center; gap:12px;
+  transition:transform 0.1s, box-shadow 0.1s, background 0.15s; text-align:left; }
+.reward-btn:not(.disabled):active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.reward-btn.disabled { opacity:0.45; cursor:not-allowed; background:#F0E8DB; }
+.reward-btn .r-emoji { font-size:36px; flex:0 0 44px; text-align:center; line-height:1; }
+.reward-btn .r-body { flex:1; min-width:0; }
+.reward-btn .r-name { font-family:'Fredoka',sans-serif; font-weight:700; font-size:16px;
+  color:var(--ink); line-height:1.1; }
+.reward-btn .r-desc { font-size:12px; color:#5A4A5D; margin-top:3px; line-height:1.25; }
+.reward-btn .r-owned { font-size:10px; color:#A63F5A; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
 
 /* Screens */
 .screen { position:absolute; inset:0;
@@ -666,7 +686,7 @@ body::before {
   <div class="screen hidden" id="journeyScreen">
     <div class="journey-header">
       <div class="journey-title" id="journeyTitle">P1 · Math</div>
-      <div class="journey-sub" id="journeySub">500 levels · 50 boss battles</div>
+      <div class="journey-sub" id="journeySub">500 levels · 100 boss battles</div>
       <div class="journey-legend">
         <span class="legend-chip"><span class="legend-swatch" style="background:#FFD66B;"></span>Now</span>
         <span class="legend-chip"><span class="legend-swatch" style="background:#A8E6CF;"></span>Done</span>
@@ -1596,6 +1616,937 @@ function getProceduralMath(lvl) {
   return qs;
 }
 
+// ============== PROCEDURAL ENGLISH GENERATOR ==============
+// Mirrors getProceduralMath. Produces hundreds of STELLAR-aligned questions per grade.
+const _procEnglishCache = {};
+function getProceduralEnglish(lvl) {
+  if (_procEnglishCache[lvl]) return _procEnglishCache[lvl];
+  const qs = [];
+  const rng = (seed) => { let s = seed; return () => { s = (s * 48271) % 2147483647; return (s - 1) / 2147483646; }; };
+  const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
+  const shuffle4 = (arr, r) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const buildOpts = (correct, distractors, r) => {
+    const pool = [correct, ...distractors].slice(0, 4);
+    while (pool.length < 4) pool.push(correct + pool.length);
+    const shuffled = shuffle4(pool, r);
+    return { opts: shuffled.map(String), a: shuffled.indexOf(correct) };
+  };
+
+  if (lvl === 'K2') {
+    const r = rng(1001);
+    // Letter recognition — uppercase, lowercase
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    for (const L of letters) {
+      const distractors = shuffle4(letters.filter(x => x !== L), r).slice(0, 3);
+      const { opts, a } = buildOpts(L, distractors, r);
+      qs.push({q:`Which letter is this: ${L}`, opts, a, topic:"NEL · Letters", exp:`This is the letter ${L}! 🔤`});
+    }
+    // Letter comes after
+    for (let i = 0; i < 20; i++) {
+      const idx = Math.floor(r() * 24);
+      const L = letters[idx];
+      const after = letters[idx + 1];
+      const distractors = shuffle4(letters.filter(x => x !== after && x !== L), r).slice(0, 3);
+      const { opts, a } = buildOpts(after, distractors, r);
+      qs.push({q:`Letter after ${L}?`, opts, a, topic:"NEL · Alphabet order", exp:`${L} → ${after}! The alphabet goes: ...${L}, ${after}...`});
+    }
+    // Beginning sounds
+    const beginWords = [
+      ['apple','A','🍎'],['ball','B','⚽'],['cat','C','🐱'],['dog','D','🐕'],['egg','E','🥚'],
+      ['fish','F','🐟'],['goat','G','🐐'],['hat','H','🎩'],['ice','I','🧊'],['jam','J','🫙'],
+      ['kite','K','🪁'],['lion','L','🦁'],['mouse','M','🐭'],['nest','N','🪹'],['owl','O','🦉'],
+      ['pig','P','🐷'],['queen','Q','👸'],['rat','R','🐀'],['sun','S','☀️'],['tree','T','🌳'],
+      ['umbrella','U','☂️'],['van','V','🚐'],['web','W','🕸️'],['fox','F','🦊'],['yarn','Y','🧶'],['zip','Z','🤐'],
+    ];
+    for (let i = 0; i < 30; i++) {
+      const [w, letter, em] = pick(beginWords, r);
+      const distractors = shuffle4(beginWords.filter(x => x[0] !== w), r).slice(0, 3).map(x => x[0]);
+      const { opts, a } = buildOpts(w, distractors, r);
+      qs.push({q:`Starts with '${letter}':`, opts, a, topic:"NEL · Beginning sounds", exp:`${w} starts with '${letter}'! ${em}`});
+    }
+    // Categories
+    const categories = [
+      {cat:'animal', members:['bird','dog','cat','fish','cow','pig','horse','duck'], nonmembers:['table','chair','book','shoe','cup','pen']},
+      {cat:'fruit', members:['apple','banana','mango','orange','pear','grape'], nonmembers:['chair','pencil','shoe','ball','hat','book']},
+      {cat:'colour', members:['red','blue','green','yellow','pink','black'], nonmembers:['big','fast','soft','loud','cold','sweet']},
+      {cat:'food', members:['rice','bread','egg','fish','soup','cake'], nonmembers:['car','tree','shoe','pen','book','lamp']},
+    ];
+    for (let i = 0; i < 20; i++) {
+      const c = pick(categories, r);
+      const correct = pick(c.members, r);
+      const distractors = shuffle4(c.nonmembers, r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`Which is a ${c.cat}?`, opts, a, topic:"NEL · Categories", exp:`${correct} is a ${c.cat}! 🎯`});
+    }
+    // Colours (object → colour)
+    const colourFacts = [
+      ['Grass','green','🌿'],['Sky','blue','☁️'],['Sun','yellow','☀️'],['Snow','white','❄️'],
+      ['Blood','red','❤️'],['Coal','black','⚫'],['Banana','yellow','🍌'],['Lemon','yellow','🍋'],
+      ['Strawberry','red','🍓'],['Leaf','green','🍃'],['Cloud','white','☁️'],['Night sky','black','🌌'],
+    ];
+    const allColours = ['red','blue','green','yellow','pink','black','white','orange','purple','brown'];
+    for (const [obj, col, em] of colourFacts) {
+      const distractors = shuffle4(allColours.filter(x => x !== col), r).slice(0, 3);
+      const { opts, a } = buildOpts(col, distractors, r);
+      qs.push({q:`${obj} is ___.`, opts, a, topic:"NEL · Colours", exp:`${obj} is ${col}! ${em}`});
+    }
+    // Concepts (number of legs, body parts)
+    const legs = [['dog',4,'🐕'],['cat',4,'🐱'],['bird',2,'🐦'],['spider',8,'🕷️'],['fish',0,'🐟'],['cow',4,'🐄'],['chicken',2,'🐔'],['horse',4,'🐴']];
+    for (const [a1, n, em] of legs) {
+      const { opts, a } = buildOpts(n, [0,2,4,6,8].filter(x => x !== n).slice(0, 3), r);
+      qs.push({q:`How many legs on a ${a1}?`, opts, a, topic:"NEL · Concepts", exp:`A ${a1} has ${n} legs! ${em}`});
+    }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P1') {
+    const r = rng(2001);
+    // Subject–verb agreement (am/is/are)
+    const subjAre = ['We','They','You','The children','The boys','My friends'];
+    const subjIs = ['He','She','It','The dog','The teacher','My mother'];
+    for (const s of subjAre) {
+      const { opts, a } = buildOpts('are', ['is','am','be'], r);
+      qs.push({q:`${s} ___ happy.`, opts, a, topic:"STELLAR P1 · Subject–verb", exp:`'${s}' is plural → 'are'. ${s} are happy!`});
+    }
+    for (const s of subjIs) {
+      const { opts, a } = buildOpts('is', ['are','am','be'], r);
+      qs.push({q:`${s} ___ happy.`, opts, a, topic:"STELLAR P1 · Subject–verb", exp:`'${s}' is singular → 'is'. ${s} is happy!`});
+    }
+    // I am
+    for (let i = 0; i < 5; i++) {
+      const adj = pick(['happy','hungry','tired','sleepy','excited'], r);
+      const { opts, a } = buildOpts('am', ['is','are','be'], r);
+      qs.push({q:`I ___ ${adj}.`, opts, a, topic:"STELLAR P1 · Subject–verb", exp:`'I' always uses 'am': I am ${adj}. 🎒`});
+    }
+    // Plurals — regular (add s)
+    const regPlurals = ['cat','dog','book','pen','cup','hat','bag','car','apple','egg','star','ship','boy','girl','tree','shoe','bird','lamp','hand','ball'];
+    for (const w of regPlurals) {
+      const correct = w + 's';
+      const distractors = [w, w + 'es', w + 'ies'];
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`Plural of ${w.toUpperCase()}:`, opts, a, topic:"STELLAR P1 · Plurals", exp:`Just add 's': 1 ${w} → 2 ${correct}!`});
+    }
+    // Plurals — -es (ends in x/s/sh/ch)
+    const esPlurals = [['box','boxes'],['bus','buses'],['fox','foxes'],['dish','dishes'],['brush','brushes'],['watch','watches'],['witch','witches'],['glass','glasses']];
+    for (const [w, plural] of esPlurals) {
+      const distractors = [w + 's', w + 'ies', w + 'en'];
+      const { opts, a } = buildOpts(plural, distractors, r);
+      qs.push({q:`Plural of ${w.toUpperCase()}:`, opts, a, topic:"STELLAR P1 · Plurals", exp:`Ends in x/s/sh/ch → add '-es': ${w} → ${plural}!`});
+    }
+    // Opposites
+    const opposites = [['hot','cold'],['big','small'],['happy','sad'],['fast','slow'],['up','down'],['in','out'],['day','night'],['old','young'],['wet','dry'],['long','short'],['high','low'],['full','empty'],['open','close'],['soft','hard'],['light','dark']];
+    const allAdj = opposites.flat();
+    for (const [w1, w2] of opposites) {
+      const distractors = shuffle4(allAdj.filter(x => x !== w1 && x !== w2), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Opposite of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P1 · Opposites", exp:`${w1} and ${w2} are opposites!`});
+    }
+    // Rhymes (simple -at, -ig, -og, -un, -ed, -ook families)
+    const rhymeFamilies = [
+      ['at', ['cat','hat','bat','rat','mat','fat','sat']],
+      ['ig', ['big','pig','dig','fig','wig','jig']],
+      ['og', ['dog','log','fog','jog','bog','hog']],
+      ['un', ['sun','run','fun','bun','gun']],
+      ['ed', ['bed','red','fed','led','wed']],
+      ['ook', ['book','look','cook','hook','took']],
+      ['ake', ['cake','lake','bake','make','take']],
+      ['ight', ['light','night','fight','right','sight']],
+    ];
+    for (const [end, words] of rhymeFamilies) {
+      for (const target of words.slice(0, 4)) {
+        const rhymes = words.filter(x => x !== target);
+        const correct = pick(rhymes, r);
+        const nonrhymes = ['ball','jump','tree','cup','house','sock','box','fish'].filter(x => !x.endsWith(end));
+        const distractors = shuffle4(nonrhymes, r).slice(0, 3);
+        const { opts, a } = buildOpts(correct, distractors, r);
+        qs.push({q:`Rhymes with ${target.toUpperCase()}:`, opts, a, topic:"STELLAR P1 · Phonics", exp:`${target} and ${correct} both end in '-${end}'!`});
+      }
+    }
+    // Articles — a vs an
+    const consonantWords = ['dog','cat','boy','girl','book','pen','car','ball','fish','tree','ship','hat'];
+    const vowelWords = ['apple','egg','orange','ant','umbrella','elephant','ice cream','ostrich','octopus'];
+    for (const w of consonantWords) {
+      const { opts, a } = buildOpts('a', ['an','the','is'], r);
+      qs.push({q:`___ ${w}`, opts, a, topic:"STELLAR P1 · Articles", exp:`Use 'a' before consonant sounds: a ${w}!`});
+    }
+    for (const w of vowelWords) {
+      const { opts, a } = buildOpts('an', ['a','the','is'], r);
+      qs.push({q:`___ ${w}`, opts, a, topic:"STELLAR P1 · Articles", exp:`Use 'an' before vowel sounds: an ${w}!`});
+    }
+    // Common irregular plurals (intro)
+    const irregPlurals1 = [['man','men'],['woman','women'],['child','children'],['foot','feet']];
+    for (const [w, p] of irregPlurals1) {
+      const distractors = [w + 's', w + 'es', w + 'ies'];
+      const { opts, a } = buildOpts(p, distractors, r);
+      qs.push({q:`Plural of ${w.toUpperCase()}:`, opts, a, topic:"STELLAR P1 · Irregular plurals", exp:`${w} → ${p}. Memorise this irregular one!`});
+    }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P2') {
+    const r = rng(3001);
+    // Past tense — regular (-ed)
+    const regPast = ['jump','walk','talk','play','watch','look','cook','help','clean','paint','wash','laugh','dance','call','open','close','pull','push','kick','bake','wait','stop','want','end','start','finish','climb','learn','listen','rain'];
+    for (const v of regPast) {
+      const correct = v.endsWith('e') ? v + 'd' : v + 'ed';
+      const distractors = [v + 's', v + 'ing', v];
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`Past of ${v.toUpperCase()}:`, opts, a, topic:"STELLAR P2 · Past tense", exp:`Regular verbs add '-ed': ${v} → ${correct}!`});
+    }
+    // Past tense — irregular
+    const irregPast = [['eat','ate'],['go','went'],['see','saw'],['come','came'],['run','ran'],['give','gave'],['take','took'],['do','did'],['have','had'],['make','made'],['say','said'],['find','found'],['sing','sang'],['sit','sat'],['stand','stood'],['sleep','slept'],['write','wrote'],['read','read'],['drink','drank'],['fall','fell'],['feel','felt'],['catch','caught'],['teach','taught'],['buy','bought'],['bring','brought'],['get','got'],['tell','told'],['sell','sold'],['hold','held'],['keep','kept'],['send','sent'],['lose','lost']];
+    for (const [v, p] of irregPast) {
+      const distractors = [v + 'ed', v + 'd', v + 's'];
+      const { opts, a } = buildOpts(p, distractors, r);
+      qs.push({q:`Past of ${v.toUpperCase()}:`, opts, a, topic:"STELLAR P2 · Irregular past", exp:`${v.toUpperCase()} → ${p.toUpperCase()} is irregular. No '-ed'!`});
+    }
+    // Possessives (his/her/their/our/my/your)
+    const possessives = [
+      ['The boy', 'his'], ['The girl', 'her'], ['The children', 'their'],
+      ['My brother', 'his'], ['My sister', 'her'], ['The parents', 'their'],
+      ['The man', 'his'], ['The woman', 'her'], ['The teachers', 'their'],
+    ];
+    for (const [subj, pos] of possessives) {
+      const distractors = ['his','her','their','my'].filter(x => x !== pos).slice(0, 3);
+      const { opts, a } = buildOpts(pos, distractors, r);
+      qs.push({q:`${subj} likes ___ toy.`, opts, a, topic:"STELLAR P2 · Possessives", exp:`'${subj}' → ${pos}.`});
+    }
+    // Antonyms
+    const p2Antonyms = [['happy','sad'],['fast','slow'],['rich','poor'],['brave','scared'],['clean','dirty'],['clever','silly'],['kind','cruel'],['thick','thin'],['strong','weak'],['noisy','quiet'],['easy','hard'],['sweet','sour'],['same','different'],['early','late'],['beautiful','ugly'],['near','far']];
+    const p2AdjPool = p2Antonyms.flat();
+    for (const [w1, w2] of p2Antonyms) {
+      const distractors = shuffle4(p2AdjPool.filter(x => x !== w1 && x !== w2), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Opposite of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P2 · Antonyms", exp:`${w1} and ${w2} are opposites!`});
+    }
+    // Synonyms
+    const synonyms = [['small','tiny'],['big','huge'],['happy','joyful'],['fast','quick'],['smart','clever'],['begin','start'],['end','finish'],['shout','yell'],['help','assist'],['pretty','beautiful'],['scared','afraid'],['angry','mad'],['tired','weary'],['rich','wealthy'],['nice','kind']];
+    const synPool = synonyms.flat();
+    for (const [w1, w2] of synonyms) {
+      const distractors = shuffle4(synPool.filter(x => x !== w1 && x !== w2).concat(['big','small','tall','wide','long','short','fat','old']), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Synonym of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P2 · Synonyms", exp:`${w1} and ${w2} mean the same!`});
+    }
+    // Adverbs — add -ly
+    const advBases = ['quick','slow','beautiful','sad','happy','careful','loud','quiet','kind','polite','brave','easy','wild','gentle','safe','bright','clear','proud','neat','nice'];
+    for (const b of advBases) {
+      const correct = b.endsWith('y') ? b.slice(0,-1) + 'ily' : b + 'ly';
+      const distractors = [b, b + 's', b + 'er'];
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`She works ___.`, opts, a, topic:"STELLAR P2 · Adverbs", exp:`Adverbs describe HOW — ${b} → ${correct}!`});
+    }
+    // Irregular plurals (advanced)
+    const p2IrregPlural = [['mouse','mice'],['tooth','teeth'],['goose','geese'],['foot','feet'],['man','men'],['woman','women'],['child','children'],['person','people']];
+    for (const [w, p] of p2IrregPlural) {
+      const distractors = [w + 's', w + 'es', w + 'ies'];
+      const { opts, a } = buildOpts(p, distractors, r);
+      qs.push({q:`Plural of ${w.toUpperCase()}:`, opts, a, topic:"STELLAR P2 · Irregular plurals", exp:`${w} → ${p} is irregular!`});
+    }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P3') {
+    const r = rng(4001);
+    // Irregular past (harder set)
+    const p3IrregPast = [['fly','flew'],['break','broke'],['throw','threw'],['swim','swam'],['begin','began'],['drive','drove'],['rise','rose'],['ride','rode'],['wake','woke'],['freeze','froze'],['choose','chose'],['speak','spoke'],['steal','stole'],['shake','shook'],['grow','grew'],['blow','blew'],['know','knew'],['draw','drew'],['forget','forgot'],['forgive','forgave'],['hide','hid'],['bite','bit'],['beat','beat'],['win','won'],['wear','wore'],['tear','tore'],['wind','wound'],['mean','meant'],['meet','met'],['lead','led']];
+    for (const [v, p] of p3IrregPast) {
+      const distractors = [v + 'ed', v + 'd', v + 's'];
+      const { opts, a } = buildOpts(p, distractors, r);
+      qs.push({q:`Past of ${v.toUpperCase()}:`, opts, a, topic:"STELLAR P3 · Irregular past", exp:`${v.toUpperCase()} → ${p.toUpperCase()}. An irregular verb.`});
+    }
+    // Prefixes
+    const prefixes = [['un','not','unhappy = not happy'],['re','again','redo = do again'],['pre','before','preview = view before'],['dis','not','dislike = not like'],['mis','wrong','mistake = wrong take'],['over','too much','overeat = eat too much'],['under','too little','underpaid = paid too little']];
+    for (const [pre, mean, ex] of prefixes) {
+      const distractors = shuffle4(prefixes.filter(x => x[0] !== pre).map(x => x[0] + '-'), r).slice(0, 3);
+      const { opts, a } = buildOpts(pre + '-', distractors, r);
+      qs.push({q:`Prefix meaning '${mean}':`, opts, a, topic:"STELLAR P3 · Prefixes", exp:`${pre}- means '${mean}'. Example: ${ex}!`});
+    }
+    // Contractions
+    const contractions = [['it is',"it's"],['do not',"don't"],['cannot',"can't"],['I am',"I'm"],['you are',"you're"],['we are',"we're"],['they are',"they're"],['he is',"he's"],['she is',"she's"],['will not',"won't"],['would not',"wouldn't"],['should not',"shouldn't"],['have not',"haven't"],['has not',"hasn't"],['did not',"didn't"],['is not',"isn't"],['are not',"aren't"],['let us',"let's"]];
+    for (const [full, cont] of contractions) {
+      const distractors = shuffle4(contractions.filter(x => x[1] !== cont).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(cont, distractors, r);
+      qs.push({q:`Contraction of '${full}':`, opts, a, topic:"STELLAR P3 · Contractions", exp:`${full} = ${cont}.`});
+    }
+    // Homophones
+    const homophones = [['their','there'],['hear','here'],['write','right'],['son','sun'],['buy','by'],['knight','night'],['flower','flour'],['pair','pear'],['sea','see'],['knot','not'],['meat','meet'],['blue','blew'],['tail','tale'],['weak','week'],['road','rode'],['nose','knows']];
+    for (const [w1, w2] of homophones) {
+      const distractors = shuffle4(homophones.filter(x => x[0] !== w1 && x[1] !== w2).flat(), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Homophone of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P3 · Homophones", exp:`${w1} and ${w2} sound alike but have different meanings!`});
+    }
+    // Suffixes
+    const suffixes = [['-er','one who does','teacher = one who teaches'],['-or','one who does','actor = one who acts'],['-ly','in a way','quickly = in a quick way'],['-ful','full of','joyful = full of joy'],['-less','without','careless = without care'],['-ness','state of','kindness = state of being kind'],['-able','can be','readable = can be read'],['-ment','result of','movement = result of moving']];
+    for (const [suf, mean, ex] of suffixes) {
+      const distractors = shuffle4(suffixes.filter(x => x[0] !== suf).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(suf, distractors, r);
+      qs.push({q:`Suffix meaning '${mean}':`, opts, a, topic:"STELLAR P3 · Suffixes", exp:`${suf} means '${mean}'. Example: ${ex}.`});
+    }
+    // Advanced plurals
+    const p3Plural = [['wolf','wolves'],['leaf','leaves'],['knife','knives'],['life','lives'],['wife','wives'],['shelf','shelves'],['loaf','loaves'],['calf','calves'],['half','halves'],['thief','thieves']];
+    for (const [w, p] of p3Plural) {
+      const distractors = [w + 's', w + 'es', w + 'ies'];
+      const { opts, a } = buildOpts(p, distractors, r);
+      qs.push({q:`Plural of ${w.toUpperCase()}:`, opts, a, topic:"STELLAR P3 · Plurals -ves", exp:`Words ending in -f/-fe → -ves: ${w} → ${p}!`});
+    }
+    // Antonyms (advanced)
+    const p3Ant = [['ancient','modern'],['generous','greedy'],['polite','rude'],['brave','cowardly'],['honest','dishonest'],['wise','foolish'],['gentle','harsh'],['innocent','guilty'],['hollow','solid'],['eager','reluctant'],['humble','proud'],['cautious','reckless'],['scarce','plentiful'],['temporary','permanent']];
+    const p3AntPool = p3Ant.flat();
+    for (const [w1, w2] of p3Ant) {
+      const distractors = shuffle4(p3AntPool.filter(x => x !== w1 && x !== w2), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Antonym of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P3 · Antonyms", exp:`${w1} ↔ ${w2} are opposites.`});
+    }
+    // Its vs it's
+    for (let i = 0; i < 6; i++) {
+      const usages = [
+        ["___ raining.","It's","\"It's raining\" = It is raining."],
+        ["The dog wags ___ tail.","Its","\"Its tail\" = the tail belonging to it. No apostrophe."],
+        ["___ time to go!","It's","\"It's time\" = It is time."],
+        ["The cat licked ___ paw.","Its","Possessive: the paw belonging to it. No apostrophe."],
+      ];
+      const [sent, correct, expl] = pick(usages, r);
+      const { opts, a } = buildOpts(correct, ["Its","It's","Its'","Itss"].filter(x => x !== correct), r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P3 · Its vs It's", exp:expl});
+    }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  _procEnglishCache[lvl] = qs;
+  return qs;
+}
+
+// ============== PROCEDURAL CHINESE GENERATOR ==============
+// Generates pinyin ↔ character drills aligned to 欢乐伙伴 syllabus.
+const _procChineseCache = {};
+function getProceduralChinese(lvl) {
+  if (_procChineseCache[lvl]) return _procChineseCache[lvl];
+  const qs = [];
+  const rng = (seed) => { let s = seed; return () => { s = (s * 48271) % 2147483647; return (s - 1) / 2147483646; }; };
+  const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
+  const shuffle4 = (arr, r) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const buildOpts = (correct, distractors, r) => {
+    const pool = [correct, ...distractors].slice(0, 4);
+    const shuffled = shuffle4(pool, r);
+    return { opts: shuffled.map(String), a: shuffled.indexOf(correct) };
+  };
+
+  // Shared vocabulary tables
+  const numbers = [['yī','一',1],['èr','二',2],['sān','三',3],['sì','四',4],['wǔ','五',5],['liù','六',6],['qī','七',7],['bā','八',8],['jiǔ','九',9],['shí','十',10]];
+  const colours = [['hóng','红','red'],['lán','蓝','blue'],['lǜ','绿','green'],['huáng','黄','yellow'],['bái','白','white'],['hēi','黑','black'],['fěn','粉','pink'],['zǐ','紫','purple']];
+  const family = [['bàba','爸爸','father'],['māma','妈妈','mother'],['gēge','哥哥','elder brother'],['jiějie','姐姐','elder sister'],['dìdi','弟弟','younger brother'],['mèimei','妹妹','younger sister'],['yéye','爷爷','grandpa (paternal)'],['nǎinai','奶奶','grandma (paternal)']];
+  const body = [['tóu','头','head'],['shǒu','手','hand'],['jiǎo','脚','foot'],['yǎnjing','眼睛','eyes'],['bízi','鼻子','nose'],['zuǐ','嘴','mouth'],['ěrduo','耳朵','ear']];
+  const animals = [['māo','猫','cat'],['gǒu','狗','dog'],['yú','鱼','fish'],['niǎo','鸟','bird'],['mǎ','马','horse'],['niú','牛','cow'],['yáng','羊','sheep'],['zhū','猪','pig']];
+  const verbs = [['chī','吃','eat'],['hē','喝','drink'],['kàn','看','look/watch'],['tīng','听','listen'],['shuō','说','speak'],['xiě','写','write'],['dú','读','read'],['zǒu','走','walk'],['pǎo','跑','run'],['xué','学','learn']];
+  const school = [['shū','书','book'],['bǐ','笔','pen'],['zhuōzi','桌子','table'],['yǐzi','椅子','chair'],['shūbāo','书包','schoolbag'],['lǎoshī','老师','teacher'],['xuésheng','学生','student'],['xuéxiào','学校','school']];
+
+  if (lvl === 'K2') {
+    const r = rng(5001);
+    // Pinyin → character (numbers)
+    for (const [py, ch, n] of numbers) {
+      const distractors = shuffle4(numbers.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} = ?`, opts, a, topic:"NEL 华文 · 数字", exp:`${py} = ${ch} = ${n}!`});
+    }
+    // Character → number
+    for (const [py, ch, n] of numbers) {
+      const distractors = shuffle4(numbers.filter(x => x[2] !== n).map(x => String(x[2])), r).slice(0, 3);
+      const { opts, a } = buildOpts(String(n), distractors, r);
+      qs.push({q:`${ch} = ?`, opts, a, topic:"NEL 华文 · 数字", exp:`${ch} (${py}) = ${n}.`});
+    }
+    // Colours
+    for (const [py, ch, en] of colours) {
+      const distractors = shuffle4(colours.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} (${en}) = ?`, opts, a, topic:"NEL 华文 · 颜色", exp:`${py} = ${ch} = ${en}!`});
+    }
+    // Family
+    for (const [py, ch, en] of family) {
+      const distractors = shuffle4(family.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} = ?`, opts, a, topic:"NEL 华文 · 家人", exp:`${py} = ${ch} = ${en}.`});
+    }
+    // Animals
+    for (const [py, ch, en] of animals) {
+      const distractors = shuffle4(animals.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} (${en}) = ?`, opts, a, topic:"NEL 华文 · 动物", exp:`${py} = ${ch}!`});
+    }
+    // Body parts
+    for (const [py, ch, en] of body) {
+      const distractors = shuffle4(body.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} (${en}) = ?`, opts, a, topic:"NEL 华文 · 身体", exp:`${py} = ${ch}.`});
+    }
+    // English → character for all K2 categories (reverse-direction drills)
+    for (const [py, ch, en] of colours) {
+      const distractors = shuffle4(colours.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"NEL 华文 · 颜色", exp:`${en} = ${ch} (${py}).`});
+    }
+    for (const [py, ch, en] of family) {
+      const distractors = shuffle4(family.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"NEL 华文 · 家人", exp:`${en} = ${ch} (${py}).`});
+    }
+    for (const [py, ch, en] of animals) {
+      const distractors = shuffle4(animals.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"NEL 华文 · 动物", exp:`${en} = ${ch}.`});
+    }
+    for (const [py, ch, en] of body) {
+      const distractors = shuffle4(body.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"NEL 华文 · 身体", exp:`${en} = ${ch}.`});
+    }
+    // Character → English for colours/animals/family/body (tri-directional practice)
+    for (const [py, ch, en] of colours) {
+      const distractors = shuffle4(colours.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} means:`, opts, a, topic:"NEL 华文 · 颜色", exp:`${ch} (${py}) = ${en}.`});
+    }
+    for (const [py, ch, en] of family) {
+      const distractors = shuffle4(family.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} means:`, opts, a, topic:"NEL 华文 · 家人", exp:`${ch} (${py}) = ${en}.`});
+    }
+    for (const [py, ch, en] of animals) {
+      const distractors = shuffle4(animals.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} is which animal?`, opts, a, topic:"NEL 华文 · 动物", exp:`${ch} (${py}) = ${en}.`});
+    }
+    // Greetings
+    const k2Greet = [['你好','nǐ hǎo','hello'],['谢谢','xièxiè','thank you'],['再见','zàijiàn','goodbye'],['对不起','duìbuqǐ','sorry'],['没关系','méi guānxi','no problem'],['晚安','wǎn an','good night'],['早安','zǎo an','good morning'],['请','qǐng','please']];
+    for (const [ch, py, en] of k2Greet) {
+      const distractors = shuffle4(k2Greet.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"NEL 华文 · 问候", exp:`${en} = ${ch} (${py}).`});
+    }
+    _procChineseCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P1') {
+    const r = rng(6001);
+    // All K2 items (number + colour + family + animals + body) re-tested English → character
+    for (const [py, ch, n] of numbers) {
+      const distractors = shuffle4(numbers.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${n} in Chinese:`, opts, a, topic:"欢乐伙伴 1A · 数字", exp:`${n} = ${ch} (${py}).`});
+    }
+    // Numbers 11–20 (two-character)
+    for (let n = 11; n <= 20; n++) {
+      const ones = n % 10;
+      const ch = n < 20 ? `十${numbers[ones-1][1]}` : '二十';
+      const py = n < 20 ? `shí${numbers[ones-1][0]}` : 'èrshí';
+      const distractors = n < 20
+        ? shuffle4([`${numbers[ones-1][1]}十`, `十十`, `二${numbers[ones-1][1]}`], r).slice(0, 3)
+        : ['十二','十','二二'];
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${n} = ?`, opts, a, topic:"欢乐伙伴 1A · 数字", exp:`${n} = ${ch} (${py}). 11-19 = 十+单位!`});
+    }
+    // School items
+    for (const [py, ch, en] of school) {
+      const distractors = shuffle4(school.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en} in 华文:`, opts, a, topic:"欢乐伙伴 1A · 学校", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Verbs
+    for (const [py, ch, en] of verbs) {
+      const distractors = shuffle4(verbs.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en}:`, opts, a, topic:"欢乐伙伴 1A · 动词", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Simple sentences (subject + verb + object)
+    const simpleSentences = [
+      ['我吃饭','wǒ chī fàn','I eat rice/a meal'],
+      ['我喝水','wǒ hē shuǐ','I drink water'],
+      ['他看书','tā kàn shū','He reads a book'],
+      ['她写字','tā xiě zì','She writes characters'],
+      ['我爱妈妈','wǒ ài māma','I love mom'],
+    ];
+    for (const [sent, py, en] of simpleSentences) {
+      const distractors = shuffle4(simpleSentences.filter(x => x[0] !== sent).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(sent, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 1B · 句子", exp:`${en} = ${sent} (${py}).`});
+    }
+    // Tones on a single character
+    const toneItems = [['mā','妈','mom (1st tone: flat)'],['má','麻','hemp (2nd tone: rising)'],['mǎ','马','horse (3rd tone: dip)'],['mà','骂','scold (4th tone: falling)'],['shī','师','teacher (1st)'],['shí','十','ten (2nd)'],['shǐ','史','history (3rd)'],['shì','是','is (4th)']];
+    for (const [py, ch, hint] of toneItems) {
+      const distractors = shuffle4(toneItems.filter(x => x[1] !== ch).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${py} = ?`, opts, a, topic:"欢乐伙伴 1A · 拼音声调", exp:`${py} = ${ch}. ${hint}`});
+    }
+    // Basic adjectives
+    const p1Adj = [['大','dà','big'],['小','xiǎo','small'],['高','gāo','tall'],['矮','ǎi','short'],['长','cháng','long'],['短','duǎn','short'],['多','duō','many'],['少','shǎo','few'],['好','hǎo','good'],['坏','huài','bad'],['快','kuài','fast'],['慢','màn','slow'],['新','xīn','new'],['旧','jiù','old'],['热','rè','hot'],['冷','lěng','cold']];
+    for (const [ch, py, en] of p1Adj) {
+      const distractors = shuffle4(p1Adj.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 1B · 形容词", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Pronouns
+    const pronouns = [['我','wǒ','I/me'],['你','nǐ','you'],['他','tā','he'],['她','tā','she'],['它','tā','it'],['我们','wǒmen','we'],['你们','nǐmen','you (plural)'],['他们','tāmen','they']];
+    for (const [ch, py, en] of pronouns) {
+      const distractors = shuffle4(pronouns.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 1A · 代词", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Common objects (household)
+    const household = [['门','mén','door'],['窗','chuāng','window'],['床','chuáng','bed'],['灯','dēng','lamp'],['钟','zhōng','clock'],['车','chē','car'],['船','chuán','boat'],['飞机','fēijī','airplane'],['电视','diànshì','TV'],['电话','diànhuà','telephone']];
+    for (const [ch, py, en] of household) {
+      const distractors = shuffle4(household.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 1B · 物品", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Reverse: character → English for verbs
+    for (const [py, ch, en] of verbs) {
+      const distractors = shuffle4(verbs.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} means:`, opts, a, topic:"欢乐伙伴 1A · 动词", exp:`${ch} (${py}) = ${en}.`});
+    }
+    // Reverse: character → English for school items
+    for (const [py, ch, en] of school) {
+      const distractors = shuffle4(school.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} means:`, opts, a, topic:"欢乐伙伴 1A · 学校", exp:`${ch} (${py}) = ${en}.`});
+    }
+    _procChineseCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P2') {
+    const r = rng(7001);
+    // Measure words (量词)
+    const measureWords = [
+      ['本','běn','books','一本书 = one book'],
+      ['只','zhī','small animals','一只猫 = one cat'],
+      ['条','tiáo','long thin things','一条鱼 = one fish'],
+      ['张','zhāng','flat things','一张纸 = one paper'],
+      ['个','gè','general/people','一个人 = one person'],
+      ['辆','liàng','vehicles','一辆车 = one car'],
+      ['杯','bēi','cups','一杯水 = one cup of water'],
+      ['件','jiàn','clothes','一件衣服 = one piece of clothing'],
+    ];
+    for (const [mw, py, use, ex] of measureWords) {
+      const distractors = shuffle4(measureWords.filter(x => x[0] !== mw).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(mw, distractors, r);
+      qs.push({q:`Measure word for ${use}:`, opts, a, topic:"欢乐伙伴 2A · 量词", exp:`${mw} (${py}) — ${ex}.`});
+    }
+    // Time words
+    const timeWords = [
+      ['今天','jīntiān','today'],['明天','míngtiān','tomorrow'],['昨天','zuótiān','yesterday'],
+      ['早上','zǎoshang','morning'],['下午','xiàwǔ','afternoon'],['晚上','wǎnshang','evening'],
+      ['星期一','xīngqīyī','Monday'],['星期二','xīngqīèr','Tuesday'],['星期三','xīngqīsān','Wednesday'],
+      ['星期四','xīngqīsì','Thursday'],['星期五','xīngqīwǔ','Friday'],['星期六','xīngqīliù','Saturday'],['星期日','xīngqīrì','Sunday'],
+    ];
+    for (const [ch, py, en] of timeWords) {
+      const distractors = shuffle4(timeWords.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en} in 华文:`, opts, a, topic:"欢乐伙伴 2A · 时间", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Weather
+    const weather = [['下雨','xià yǔ','rain'],['下雪','xià xuě','snow'],['刮风','guā fēng','windy'],['晴天','qíngtiān','sunny'],['阴天','yīntiān','cloudy'],['热','rè','hot'],['冷','lěng','cold'],['暖和','nuǎnhuo','warm']];
+    for (const [ch, py, en] of weather) {
+      const distractors = shuffle4(weather.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en}:`, opts, a, topic:"欢乐伙伴 2B · 天气", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Food
+    const food = [['饭','fàn','rice/meal'],['面','miàn','noodles'],['菜','cài','dish/vegetable'],['肉','ròu','meat'],['水果','shuǐguǒ','fruit'],['蔬菜','shūcài','vegetables'],['水','shuǐ','water'],['茶','chá','tea'],['牛奶','niúnǎi','milk'],['果汁','guǒzhī','juice']];
+    for (const [ch, py, en] of food) {
+      const distractors = shuffle4(food.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en}:`, opts, a, topic:"欢乐伙伴 2A · 食物", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Question words
+    const qWords = [['什么','shénme','what'],['谁','shéi','who'],['哪里','nǎlǐ','where'],['什么时候','shénme shíhou','when'],['为什么','wèishénme','why'],['怎么','zěnme','how'],['多少','duōshao','how many']];
+    for (const [ch, py, en] of qWords) {
+      const distractors = shuffle4(qWords.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 2B · 疑问词", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Jobs / occupations
+    const jobs = [['医生','yīshēng','doctor'],['护士','hùshi','nurse'],['警察','jǐngchá','police'],['老师','lǎoshī','teacher'],['司机','sījī','driver'],['厨师','chúshī','cook'],['工人','gōngrén','worker'],['农民','nóngmín','farmer'],['学生','xuéshēng','student'],['歌手','gēshǒu','singer']];
+    for (const [ch, py, en] of jobs) {
+      const distractors = shuffle4(jobs.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 2A · 职业", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Transport
+    const transport = [['汽车','qìchē','car'],['公共汽车','gōnggòng qìchē','bus'],['火车','huǒchē','train'],['飞机','fēijī','plane'],['船','chuán','boat'],['自行车','zìxíngchē','bicycle'],['地铁','dìtiě','subway'],['出租车','chūzūchē','taxi']];
+    for (const [ch, py, en] of transport) {
+      const distractors = shuffle4(transport.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 2A · 交通", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Feelings
+    const feelings = [['高兴','gāoxìng','happy'],['难过','nánguò','sad'],['生气','shēngqì','angry'],['害怕','hàipà','scared'],['紧张','jǐnzhāng','nervous'],['兴奋','xīngfèn','excited'],['累','lèi','tired'],['饿','è','hungry'],['渴','kě','thirsty'],['困','kùn','sleepy']];
+    for (const [ch, py, en] of feelings) {
+      const distractors = shuffle4(feelings.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 2B · 感觉", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Sports / activities
+    const sports = [['跑步','pǎobù','running'],['游泳','yóuyǒng','swimming'],['踢足球','tī zúqiú','play soccer'],['打篮球','dǎ lánqiú','play basketball'],['唱歌','chànggē','singing'],['跳舞','tiàowǔ','dancing'],['画画','huàhuà','drawing'],['听音乐','tīng yīnyuè','listen to music']];
+    for (const [ch, py, en] of sports) {
+      const distractors = shuffle4(sports.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 2B · 活动", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Country names
+    const countries = [['中国','zhōngguó','China'],['新加坡','xīnjiāpō','Singapore'],['马来西亚','mǎláixīyà','Malaysia'],['美国','měiguó','USA'],['英国','yīngguó','UK'],['日本','rìběn','Japan'],['韩国','hánguó','Korea'],['澳大利亚','àodàlìyà','Australia']];
+    for (const [ch, py, en] of countries) {
+      const distractors = shuffle4(countries.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 2B · 国家", exp:`${en} = ${ch} (${py}).`});
+    }
+    _procChineseCache[lvl] = qs;
+    return qs;
+  }
+
+  if (lvl === 'P3') {
+    const r = rng(8001);
+    // Radicals
+    const radicals = [
+      ['氵','water','河、湖、海 — water words'],
+      ['扌','hand','打、拿、拍 — hand actions'],
+      ['口','mouth','吃、喝、叫 — mouth-related'],
+      ['木','wood','树、林、村 — tree/wood'],
+      ['火','fire','烧、热、炒 — fire-related'],
+      ['心','heart','想、忘、念 — feelings/thoughts'],
+      ['日','sun','明、时、早 — time/sun'],
+      ['月','moon','朋、服、期 — moon/body'],
+      ['土','earth','地、场、城 — ground/place'],
+      ['女','woman','妈、姐、她 — female'],
+    ];
+    for (const [rad, mean, ex] of radicals) {
+      const distractors = shuffle4(radicals.filter(x => x[0] !== rad).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(mean, distractors, r);
+      qs.push({q:`部首 ${rad} means:`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`${rad} = ${mean}. Found in: ${ex}`});
+    }
+    // Idioms / proverbs (simple)
+    const idioms = [
+      ['一心一意','yīxīn yīyì','wholehearted'],
+      ['自由自在','zìyóu zìzài','carefree'],
+      ['千言万语','qiānyán wànyǔ','countless words'],
+      ['三心二意','sānxīn èryì','indecisive'],
+      ['人山人海','rénshān rénhǎi','huge crowd'],
+      ['开开心心','kāikāi xīnxīn','very happy'],
+      ['安安静静','ānān jìngjìng','very quiet'],
+    ];
+    for (const [ch, py, en] of idioms) {
+      const distractors = shuffle4(idioms.filter(x => x[0] !== ch).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} (${py}) means:`, opts, a, topic:"欢乐伙伴 3A · 成语", exp:`${ch} = ${en}.`});
+    }
+    // Direction words
+    const directions = [['上','shàng','up/above'],['下','xià','down/below'],['左','zuǒ','left'],['右','yòu','right'],['前','qián','front'],['后','hòu','back'],['东','dōng','east'],['西','xī','west'],['南','nán','south'],['北','běi','north'],['里','lǐ','inside'],['外','wài','outside']];
+    for (const [ch, py, en] of directions) {
+      const distractors = shuffle4(directions.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`${en}:`, opts, a, topic:"欢乐伙伴 3A · 方位", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Opposites
+    const cnOpposites = [['大','小','big/small'],['多','少','many/few'],['长','短','long/short'],['高','矮','tall/short(person)'],['胖','瘦','fat/thin'],['早','晚','early/late'],['快','慢','fast/slow'],['新','旧','new/old'],['来','去','come/go'],['开','关','open/close']];
+    for (const [w1, w2, mean] of cnOpposites) {
+      const all = cnOpposites.flat().slice(0, 20).filter(x => x !== w1 && x !== w2 && x.length === 1);
+      const distractors = shuffle4(all, r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Opposite of ${w1} (${mean.split('/')[0]}):`, opts, a, topic:"欢乐伙伴 3B · 反义词", exp:`${w1} ↔ ${w2} (${mean}).`});
+    }
+    // Common 4-char compound expressions
+    const compounds = [['马上','mǎshàng','right away'],['小心','xiǎoxīn','careful'],['可爱','kě\'ài','cute'],['一起','yīqǐ','together'],['好吃','hǎochī','delicious'],['好看','hǎokàn','good-looking'],['不是','bùshì','is not'],['没有','méiyǒu','does not have']];
+    for (const [ch, py, en] of compounds) {
+      const distractors = shuffle4(compounds.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 3A · 词语", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Advanced vocabulary
+    const advVocab = [['图书馆','túshūguǎn','library'],['电脑','diànnǎo','computer'],['手机','shǒujī','cellphone'],['医院','yīyuàn','hospital'],['邮局','yóujú','post office'],['超市','chāoshì','supermarket'],['商店','shāngdiàn','store'],['公园','gōngyuán','park'],['机场','jīchǎng','airport'],['博物馆','bówùguǎn','museum'],['动物园','dòngwùyuán','zoo'],['餐馆','cānguǎn','restaurant']];
+    for (const [ch, py, en] of advVocab) {
+      const distractors = shuffle4(advVocab.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}" in 华文:`, opts, a, topic:"欢乐伙伴 3A · 地方", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Seasons and weather events
+    const seasons = [['春天','chūntiān','spring'],['夏天','xiàtiān','summer'],['秋天','qiūtiān','autumn'],['冬天','dōngtiān','winter'],['台风','táifēng','typhoon'],['雷电','léidiàn','thunder&lightning'],['彩虹','cǎihóng','rainbow'],['太阳','tàiyáng','sun'],['月亮','yuèliàng','moon'],['星星','xīngxīng','star']];
+    for (const [ch, py, en] of seasons) {
+      const distractors = shuffle4(seasons.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 3B · 季节自然", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Verbs (advanced)
+    const p3Verbs = [['开始','kāishǐ','begin'],['结束','jiéshù','finish'],['帮助','bāngzhù','help'],['记得','jìdé','remember'],['忘记','wàngjì','forget'],['希望','xīwàng','hope'],['需要','xūyào','need'],['喜欢','xǐhuan','like'],['讨厌','tǎoyàn','hate'],['认识','rènshi','know (someone)']];
+    for (const [ch, py, en] of p3Verbs) {
+      const distractors = shuffle4(p3Verbs.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 3A · 动词", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Festivals & cultural items
+    const festivals = [['新年','xīnnián','New Year'],['春节','chūnjié','Lunar New Year'],['中秋节','zhōngqiūjié','Mid-Autumn'],['端午节','duānwǔjié','Dragon Boat'],['月饼','yuèbǐng','mooncake'],['红包','hóngbāo','red packet'],['灯笼','dēnglong','lantern'],['舞龙','wǔlóng','dragon dance']];
+    for (const [ch, py, en] of festivals) {
+      const distractors = shuffle4(festivals.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 3B · 节日", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Reverse-direction radicals (char → meaning already done; now meaning → char of radical)
+    const radicalsList = [['water','氵'],['hand','扌'],['mouth','口'],['wood','木'],['fire','火'],['heart','心'],['sun','日'],['moon','月'],['earth','土'],['woman','女']];
+    for (const [mean, rad] of radicalsList) {
+      const distractors = shuffle4(radicalsList.filter(x => x[1] !== rad).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(rad, distractors, r);
+      qs.push({q:`Radical for "${mean}":`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`"${mean}" radical = ${rad}.`});
+    }
+    _procChineseCache[lvl] = qs;
+    return qs;
+  }
+
+  _procChineseCache[lvl] = qs;
+  return qs;
+}
+
+// ============== PROCEDURAL KOREAN GENERATOR ==============
+// Adds drill-style questions to the Korean bank, staged via `ml` tags so they
+// unlock alongside the hand-curated curriculum.
+const _procKoreanCache = {};
+function getProceduralKorean() {
+  if (_procKoreanCache.all) return _procKoreanCache.all;
+  const qs = [];
+  const rng = (seed) => { let s = seed; return () => { s = (s * 48271) % 2147483647; return (s - 1) / 2147483646; }; };
+  const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
+  const shuffle4 = (arr, r) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const buildOpts = (correct, distractors, r) => {
+    const pool = [correct, ...distractors].slice(0, 4);
+    while (pool.length < 4) pool.push(correct + pool.length);
+    const shuffled = shuffle4(pool, r);
+    return { opts: shuffled.map(String), a: shuffled.indexOf(correct) };
+  };
+
+  const r = rng(9001);
+
+  // ==== STAGE 1 (ml:1) — HANGUL ====
+  // Basic consonants
+  const consonants = [['ㄱ','g/k'],['ㄴ','n'],['ㄷ','d/t'],['ㄹ','r/l'],['ㅁ','m'],['ㅂ','b/p'],['ㅅ','s'],['ㅇ','ng (silent initial)'],['ㅈ','j'],['ㅊ','ch'],['ㅋ','k'],['ㅌ','t'],['ㅍ','p'],['ㅎ','h']];
+  for (const [c, snd] of consonants) {
+    const distractors = shuffle4(consonants.filter(x => x[0] !== c).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(snd, distractors, r);
+    qs.push({ml:1, q:`${c} sounds like:`, opts, a, topic:"Stage 1 · 자음", exp:`${c} = ${snd}.`});
+  }
+  // Basic vowels
+  const vowels = [['ㅏ','a (as in father)'],['ㅓ','eo (as in bird)'],['ㅗ','o (as in go)'],['ㅜ','u (as in boot)'],['ㅡ','eu (as in put)'],['ㅣ','i (as in see)'],['ㅐ','ae (as in cat)'],['ㅔ','e (as in bed)'],['ㅑ','ya'],['ㅕ','yeo'],['ㅛ','yo'],['ㅠ','yu']];
+  for (const [v, snd] of vowels) {
+    const distractors = shuffle4(vowels.filter(x => x[0] !== v).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(snd, distractors, r);
+    qs.push({ml:1, q:`${v} sounds like:`, opts, a, topic:"Stage 1 · 모음", exp:`${v} = ${snd}.`});
+  }
+  // Syllable blocks (consonant + vowel)
+  const syllables = [['가','ga'],['나','na'],['다','da'],['라','ra'],['마','ma'],['바','ba'],['사','sa'],['아','a'],['자','ja'],['거','geo'],['너','neo'],['머','meo'],['서','seo'],['어','eo'],['고','go'],['노','no'],['도','do'],['모','mo'],['보','bo'],['소','so'],['오','o'],['구','gu'],['누','nu'],['두','du'],['무','mu'],['부','bu'],['수','su'],['우','u'],['기','gi'],['니','ni'],['디','di'],['미','mi'],['비','bi'],['시','si'],['이','i']];
+  for (const [syl, rom] of syllables) {
+    const distractors = shuffle4(syllables.filter(x => x[0] !== syl).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(rom, distractors, r);
+    qs.push({ml:1, q:`Read: ${syl}`, opts, a, topic:"Stage 1 · 음절", exp:`${syl} = ${rom}. Consonant + vowel = syllable.`});
+  }
+  // Double consonants (쌍자음)
+  const doubleCons = [['ㄲ','kk'],['ㄸ','tt'],['ㅃ','pp'],['ㅆ','ss'],['ㅉ','jj']];
+  for (const [c, snd] of doubleCons) {
+    const distractors = shuffle4(doubleCons.filter(x => x[0] !== c).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(snd, distractors, r);
+    qs.push({ml:1, q:`${c} sounds like:`, opts, a, topic:"Stage 1 · 쌍자음", exp:`${c} = ${snd} (tense/strong version).`});
+  }
+
+  // ==== STAGE 2 (ml:31) — GREETINGS & ESSENTIALS ====
+  const greetings = [
+    ['안녕하세요','annyeonghaseyo','Hello (polite)'],
+    ['감사합니다','gamsahamnida','Thank you (formal)'],
+    ['고마워요','gomawoyo','Thank you (polite)'],
+    ['죄송합니다','joesonghamnida','I am sorry (formal)'],
+    ['미안해요','mianhaeyo','I am sorry (polite)'],
+    ['네','ne','Yes'],
+    ['아니요','aniyo','No'],
+    ['잘 지내세요','jal jinaeseyo','How are you'],
+    ['안녕히 가세요','annyeonghi gaseyo','Goodbye (to person leaving)'],
+    ['안녕히 계세요','annyeonghi gyeseyo','Goodbye (to person staying)'],
+    ['반갑습니다','bangapseumnida','Nice to meet you'],
+    ['잘 자요','jal jayo','Sleep well'],
+  ];
+  for (const [ko, rom, en] of greetings) {
+    const distractors = shuffle4(greetings.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:31, q:`"${en}":`, opts, a, topic:"Stage 2 · 인사", exp:`${en} = ${ko} (${rom}).`});
+  }
+
+  // ==== STAGE 3 (ml:61) — NUMBERS ====
+  const sinoNum = [['일','1'],['이','2'],['삼','3'],['사','4'],['오','5'],['육','6'],['칠','7'],['팔','8'],['구','9'],['십','10'],['백','100'],['천','1000']];
+  const nativeNum = [['하나','1'],['둘','2'],['셋','3'],['넷','4'],['다섯','5'],['여섯','6'],['일곱','7'],['여덟','8'],['아홉','9'],['열','10']];
+  for (const [ko, n] of sinoNum) {
+    const distractors = shuffle4(sinoNum.filter(x => x[1] !== n).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(n, distractors, r);
+    qs.push({ml:61, q:`${ko} (Sino-Korean) = ?`, opts, a, topic:"Stage 3 · 한자어 숫자", exp:`${ko} = ${n} (Sino-Korean — for dates, money, phone numbers).`});
+  }
+  for (const [ko, n] of nativeNum) {
+    const distractors = shuffle4(nativeNum.filter(x => x[1] !== n).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(n, distractors, r);
+    qs.push({ml:61, q:`${ko} (Native Korean) = ?`, opts, a, topic:"Stage 3 · 고유어 숫자", exp:`${ko} = ${n} (Native — for age, hours, counting people).`});
+  }
+  // Days of week
+  const days = [['월요일','Monday'],['화요일','Tuesday'],['수요일','Wednesday'],['목요일','Thursday'],['금요일','Friday'],['토요일','Saturday'],['일요일','Sunday']];
+  for (const [ko, en] of days) {
+    const distractors = shuffle4(days.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:61, q:`${en}:`, opts, a, topic:"Stage 3 · 요일", exp:`${en} = ${ko}.`});
+  }
+
+  // ==== STAGE 4 (ml:101) — VOCABULARY ====
+  const foodKo = [['밥','bap','rice/meal'],['김치','gimchi','kimchi'],['물','mul','water'],['빵','ppang','bread'],['우유','uyu','milk'],['커피','keopi','coffee'],['차','cha','tea'],['사과','sagwa','apple'],['고기','gogi','meat'],['국수','guksu','noodles']];
+  for (const [ko, rom, en] of foodKo) {
+    const distractors = shuffle4(foodKo.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:101, q:`${en}:`, opts, a, topic:"Stage 4 · 음식", exp:`${en} = ${ko} (${rom}).`});
+  }
+  const familyKo = [['엄마','eomma','mom'],['아빠','appa','dad'],['형','hyeong','older brother (male speaker)'],['누나','nuna','older sister (male speaker)'],['오빠','oppa','older brother (female speaker)'],['언니','eonni','older sister (female speaker)'],['동생','dongsaeng','younger sibling'],['할아버지','harabeoji','grandpa'],['할머니','halmeoni','grandma'],['친구','chingu','friend']];
+  for (const [ko, rom, en] of familyKo) {
+    const distractors = shuffle4(familyKo.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:101, q:`${en}:`, opts, a, topic:"Stage 4 · 가족", exp:`${en} = ${ko} (${rom}).`});
+  }
+  const placesKo = [['학교','hakgyo','school'],['집','jip','house/home'],['병원','byeongwon','hospital'],['식당','sikdang','restaurant'],['카페','kape','café'],['공원','gongwon','park'],['도서관','doseogwan','library'],['시장','sijang','market'],['은행','eunhaeng','bank'],['가게','gage','store']];
+  for (const [ko, rom, en] of placesKo) {
+    const distractors = shuffle4(placesKo.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:101, q:`${en}:`, opts, a, topic:"Stage 4 · 장소", exp:`${en} = ${ko} (${rom}).`});
+  }
+
+  // ==== STAGE 5 (ml:161) — VERBS ====
+  const verbsKo = [
+    ['가다','gada','to go'],['오다','oda','to come'],['먹다','meokda','to eat'],['마시다','masida','to drink'],
+    ['자다','jada','to sleep'],['일어나다','ireonada','to wake up/stand up'],['공부하다','gongbuhada','to study'],
+    ['일하다','ilhada','to work'],['보다','boda','to see/watch'],['듣다','deutda','to listen'],
+    ['읽다','ikda','to read'],['쓰다','sseuda','to write/use'],['말하다','malhada','to speak'],
+    ['사다','sada','to buy'],['팔다','palda','to sell'],['만나다','mannada','to meet'],
+    ['좋아하다','joahada','to like'],['사랑하다','saranghada','to love'],['싫어하다','sireohada','to dislike'],
+    ['웃다','utda','to laugh/smile'],['울다','ulda','to cry'],['알다','alda','to know'],
+    ['모르다','moreuda','to not know'],['있다','itda','to have/exist'],['없다','eopda','to not have'],
+  ];
+  for (const [ko, rom, en] of verbsKo) {
+    const distractors = shuffle4(verbsKo.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:161, q:`${en}:`, opts, a, topic:"Stage 5 · 동사", exp:`${en} = ${ko} (${rom}).`});
+  }
+  // -아요/어요 polite conjugation
+  const conjugations = [
+    ['가다','가요','go (polite)'],
+    ['오다','와요','come (polite)'],
+    ['먹다','먹어요','eat (polite)'],
+    ['마시다','마셔요','drink (polite)'],
+    ['보다','봐요','see (polite)'],
+    ['읽다','읽어요','read (polite)'],
+    ['자다','자요','sleep (polite)'],
+    ['좋아하다','좋아해요','like (polite)'],
+  ];
+  for (const [dict, pol, en] of conjugations) {
+    const distractors = shuffle4(conjugations.filter(x => x[0] !== dict).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(pol, distractors, r);
+    qs.push({ml:161, q:`${dict} (${en}) in 해요 form:`, opts, a, topic:"Stage 5 · 해요체", exp:`${dict} → ${pol}. Polite everyday form.`});
+  }
+
+  // ==== STAGE 6 (ml:221) — PARTICLES ====
+  const particles = [
+    ['는/은','topic marker','저는 학생이에요 = As for me, I am a student'],
+    ['이/가','subject marker','비가 와요 = Rain is coming'],
+    ['을/를','object marker','밥을 먹어요 = I eat rice'],
+    ['에','to/at (place, time)','학교에 가요 = I go to school'],
+    ['에서','at/from (action location)','집에서 공부해요 = I study at home'],
+    ['도','also','저도 가요 = I also go'],
+    ['과/와','and (with noun)','빵과 우유 = bread and milk'],
+    ['로/으로','by means of / toward','버스로 가요 = I go by bus'],
+  ];
+  for (const [p, use, ex] of particles) {
+    const distractors = shuffle4(particles.filter(x => x[0] !== p).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(p, distractors, r);
+    qs.push({ml:221, q:`Particle for: ${use}`, opts, a, topic:"Stage 6 · 조사", exp:`${p} — ${use}. Ex: ${ex}`});
+  }
+
+  // ==== STAGE 7 (ml:281) — SENTENCES ====
+  const sentences = [
+    ['저는 학생이에요','jeoneun haksaengieyo','I am a student'],
+    ['이름이 뭐예요?','ireumi mwoyeyo','What is your name?'],
+    ['어디에서 왔어요?','eodieseo wasseoyo','Where are you from?'],
+    ['만나서 반갑습니다','mannaseo bangapseumnida','Nice to meet you'],
+    ['한국어를 공부해요','hangugeoreul gongbuhaeyo','I study Korean'],
+    ['저는 영국 사람이에요','jeoneun yeongguk saramieyo','I am British'],
+    ['밥을 먹었어요','babeul meogeosseoyo','I ate rice (past)'],
+    ['저는 커피를 좋아해요','jeoneun keopireul joahaeyo','I like coffee'],
+    ['화장실이 어디예요?','hwajangsiri eodiyeyo','Where is the bathroom?'],
+    ['얼마예요?','eolmayeyo','How much is it?'],
+  ];
+  for (const [ko, rom, en] of sentences) {
+    const distractors = shuffle4(sentences.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:281, q:`"${en}":`, opts, a, topic:"Stage 7 · 문장", exp:`${en} = ${ko} (${rom}).`});
+  }
+
+  // ==== STAGE 8 (ml:351) — PRACTICAL ====
+  const practical = [
+    ['이거 주세요','igeo juseyo','Please give me this'],
+    ['얼마예요?','eolmayeyo','How much?'],
+    ['비싸요','bissayo','It\'s expensive'],
+    ['싸요','ssayo','It\'s cheap'],
+    ['도와주세요','dowajuseyo','Please help'],
+    ['천천히 말해주세요','cheoncheonhi malhaejuseyo','Please speak slowly'],
+    ['다시 말해주세요','dasi malhaejuseyo','Please say it again'],
+    ['괜찮아요','gwaenchanayo','It\'s okay / No problem'],
+    ['맛있어요','masisseoyo','It\'s delicious'],
+    ['배고파요','baegopayo','I\'m hungry'],
+    ['피곤해요','pigonhaeyo','I\'m tired'],
+    ['몰라요','mollayo','I don\'t know'],
+    ['알겠어요','algesseoyo','I understand'],
+    ['이해해요','ihaehaeyo','I understand'],
+    ['좋아요','joayo','It\'s good / I like it'],
+  ];
+  for (const [ko, rom, en] of practical) {
+    const distractors = shuffle4(practical.filter(x => x[0] !== ko).map(x => x[0]), r).slice(0, 3);
+    const { opts, a } = buildOpts(ko, distractors, r);
+    qs.push({ml:351, q:`"${en}":`, opts, a, topic:"Stage 8 · 실생활", exp:`${en} = ${ko} (${rom}).`});
+  }
+
+  // ==== STAGE 9 (ml:421) — GRAMMAR ====
+  const grammar = [
+    ['-았/었-','past tense marker','먹었어요 = I ate'],
+    ['-겠-','will / intention','가겠습니다 = I will go'],
+    ['-고 싶다','want to','먹고 싶어요 = I want to eat'],
+    ['-지 마세요','don\'t do (polite)','가지 마세요 = Please don\'t go'],
+    ['-(으)세요','polite command','앉으세요 = Please sit'],
+    ['-ㄹ/을 거예요','will (future)','갈 거예요 = I will go'],
+    ['-(으)면','if','비가 오면 = if it rains'],
+    ['-아/어서','because/and then','피곤해서 자요 = I sleep because I\'m tired'],
+    ['-(으)ㄹ 수 있다','can (ability)','할 수 있어요 = I can do it'],
+    ['-(으)ㄹ 수 없다','cannot','할 수 없어요 = I cannot do it'],
+  ];
+  for (const [form, mean, ex] of grammar) {
+    const distractors = shuffle4(grammar.filter(x => x[0] !== form).map(x => x[1]), r).slice(0, 3);
+    const { opts, a } = buildOpts(mean, distractors, r);
+    qs.push({ml:421, q:`Grammar ${form} means:`, opts, a, topic:"Stage 9 · 문법", exp:`${form} = ${mean}. Ex: ${ex}`});
+  }
+
+  _procKoreanCache.all = qs;
+  return qs;
+}
+
 // ============== EXPANDED ENGLISH BANKS ==============
 const EXTRA_ENGLISH = {
   K2: [
@@ -1694,34 +2645,54 @@ const EXTRA_CHINESE = {
 
 function getQuestionPool(lvl, subj) {
   const tag = (arr, src) => arr.map((q, i) => ({...q, _id: `${src}_${i}`, _src: src}));
+  // Dedup by question text. Two different entries (possibly from different
+  // sources, or from procedural generators producing the same prompt twice)
+  // that share the same `q` text would break the no-repeat contract — the
+  // player would see "2 + 3 = ?" twice if they came in as different _ids.
+  // Keeping the FIRST occurrence preserves the priority order: static first,
+  // then EXTRA banks, then procedural.
+  const dedup = arr => {
+    const seen = new Set();
+    return arr.filter(q => { if (seen.has(q.q)) return false; seen.add(q.q); return true; });
+  };
+  const isKidsGrade = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3');
   if (subj === 'mixed') {
     const stat = Q[lvl] || {};
-    const proc = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3') ? getProceduralMath(lvl) : [];
+    const procM = isKidsGrade ? getProceduralMath(lvl) : [];
+    const procE = isKidsGrade ? getProceduralEnglish(lvl) : [];
+    const procC = isKidsGrade ? getProceduralChinese(lvl) : [];
     const extraE = EXTRA_ENGLISH[lvl] || [];
     const extraC = EXTRA_CHINESE[lvl] || [];
-    return [
-      ...tag(stat.math||[], 'math'), ...tag(proc, 'pm'),
-      ...tag(stat.english||[], 'english'), ...tag(extraE, 'ee'),
-      ...tag(stat.chinese||[], 'chinese'), ...tag(extraC, 'ec'),
-    ];
+    return dedup([
+      ...tag(stat.math||[], 'math'), ...tag(procM, 'pm'),
+      ...tag(stat.english||[], 'english'), ...tag(extraE, 'ee'), ...tag(procE, 'pe'),
+      ...tag(stat.chinese||[], 'chinese'), ...tag(extraC, 'ec'), ...tag(procC, 'pc'),
+    ]);
   }
   if (subj === 'math') {
     const stat = Q[lvl]?.math || [];
-    const proc = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3') ? getProceduralMath(lvl) : [];
-    return [...tag(stat, 'math'), ...tag(proc, 'pm')];
+    const proc = isKidsGrade ? getProceduralMath(lvl) : [];
+    return dedup([...tag(stat, 'math'), ...tag(proc, 'pm')]);
   }
   if (subj === 'english') {
     const stat = Q[lvl]?.english || [];
     const extra = EXTRA_ENGLISH[lvl] || [];
-    return [...tag(stat, 'english'), ...tag(extra, 'ee')];
+    const proc = isKidsGrade ? getProceduralEnglish(lvl) : [];
+    return dedup([...tag(stat, 'english'), ...tag(extra, 'ee'), ...tag(proc, 'pe')]);
   }
   if (subj === 'chinese') {
     const stat = Q[lvl]?.chinese || [];
     const extra = EXTRA_CHINESE[lvl] || [];
-    return [...tag(stat, 'chinese'), ...tag(extra, 'ec')];
+    const proc = isKidsGrade ? getProceduralChinese(lvl) : [];
+    return dedup([...tag(stat, 'chinese'), ...tag(extra, 'ec'), ...tag(proc, 'pc')]);
+  }
+  if (subj === 'korean') {
+    const stat = Q[lvl]?.korean || [];
+    const proc = getProceduralKorean();
+    return dedup([...tag(stat, 'korean'), ...tag(proc, 'pk')]);
   }
   if (!Q[lvl] || !Q[lvl][subj]) return [];
-  return tag(Q[lvl][subj], subj);
+  return dedup(tag(Q[lvl][subj], subj));
 }
 function getSubjectLabel(s) {
   return {math:'Math', english:'English', chinese:'华文', mixed:'Mixed', korean:'Korean 🇰🇷'}[s] || s;
@@ -1785,13 +2756,41 @@ const TOWER_DEFS = {
     range:[2.5, 4.0], dmg:[2, 12], fireRate:[900, 400],
     colors:['#C7B8EA','#6B3FA0'], ringColor:'#6B4FA0',
   },
+  // ---- Boss-reward towers (unlocked via boss reward choices) ----
+  fire: {
+    name:'Fire Mage', emoji:'🔥',
+    costs:[50, 30, 33, 38, 45, 55, 68, 82, 100, 125],
+    range:[1.8, 3.2], dmg:[1, 7], fireRate:[1000, 500],
+    colors:['#FFB199','#E53935'], ringColor:'#B71C1C',
+    splash:[0.6, 1.4],  // radius in tiles; splashes at L1 with 0.6 tile radius, 1.4 at L10
+    reward:true,
+  },
+  ice: {
+    name:'Ice Wizard', emoji:'❄️',
+    costs:[55, 32, 35, 40, 48, 58, 70, 85, 105, 130],
+    range:[2.0, 3.4], dmg:[1, 5], fireRate:[1100, 550],
+    colors:['#D6EFFF','#0288D1'], ringColor:'#01579B',
+    splash:[0.5, 1.2],
+    slow:[0.10, 0.90],  // 10% at L1, +10% per upgrade (capped at 90% at L10 so enemies never freeze entirely)
+    reward:true,
+  },
+  poison: {
+    name:'Poison Witch', emoji:'🧪',
+    costs:[55, 32, 35, 40, 48, 58, 70, 85, 105, 130],
+    range:[1.9, 3.2], dmg:[1, 4], fireRate:[1200, 600],
+    colors:['#D0F5C8','#388E3C'], ringColor:'#1B5E20',
+    dot:[0.10, 0.10],  // 10% max HP every 0.5s for 3 seconds = 6 ticks (tunable below)
+    dotTicks:[6, 12],  // number of ticks (3s at L1 → 6s at L10)
+    reward:true,
+  },
 };
 
 function buildTowerLevels(def) {
   const levels = [];
+  const lerpRange = (arr, t) => arr ? (arr[0] + (arr[1] - arr[0]) * t) : null;
   for (let i = 0; i < 10; i++) {
     const t = i / 9;
-    levels.push({
+    const spec = {
       emoji: def.emoji,
       cost: def.costs[i],
       range: +(def.range[0] + (def.range[1] - def.range[0]) * t).toFixed(1),
@@ -1800,7 +2799,21 @@ function buildTowerLevels(def) {
       color: lerpHex(def.colors[0], def.colors[1], t),
       ring: i >= 3 ? (i >= 7 ? '#FFD700' : def.ringColor) : null,
       crown: i === 9,
-    });
+    };
+    // Special-effect stats (only for towers that define them)
+    if (def.splash) spec.splash = +lerpRange(def.splash, t).toFixed(2);
+    if (def.slow) {
+      // Ice: +10% per level (10% at L1 → 100% requested, but we cap at 90% to avoid permafreeze).
+      // Using the range [0.10, 0.90] gives exactly 10% increments from L1 (0.10) to L10 (0.90).
+      spec.slow = +(def.slow[0] + (def.slow[1] - def.slow[0]) * t).toFixed(2);
+      spec.slowDuration = 1500; // ms the slow lingers after the hit
+    }
+    if (def.dot) {
+      spec.dotPct = +lerpRange(def.dot, t).toFixed(2);   // fraction of max HP per tick
+      spec.dotTicks = Math.round(lerpRange(def.dotTicks, t));
+      spec.dotInterval = 500; // ms between ticks
+    }
+    levels.push(spec);
   }
   return levels;
 }
@@ -1853,8 +2866,11 @@ const PATH_VARIANTS = [
 // Design: within a level, all rounds share the same map. The player adds more
 // towers between rounds. Maps also repeat across 3 consecutive levels so the
 // player masters a layout before a new one appears.
+// Boss cadence: every 5 levels starting at level 5 (100 bosses total).
+function isBossLevel(n) { return n >= 5 && n % 5 === 0; }
+
 function getLevelSpec(n) {
-  const isBoss = n % 10 === 0;
+  const isBoss = isBossLevel(n);
   if (isBoss) {
     // Boss round: blank map, user builds maze — single big wave
     return {
@@ -1863,14 +2879,14 @@ function getLevelSpec(n) {
       entry: {col:0, row:0},
       exit: {col:6, row:7},
       waves: generateBossWaves(n),
-      startCoins: Math.min(280, 110 + Math.floor(n/10) * 25),
+      startCoins: Math.min(280, 110 + Math.floor(n/5) * 12),
       lives: 5,
-      questionsPerWave: [Math.min(5, 3 + Math.floor(n/50))],
+      questionsPerWave: [Math.min(5, 3 + Math.floor(n/100))],
     };
   }
   // Map variant stays the same for 3 consecutive levels (map mastery).
-  // Skip the boss slot when cycling so the pattern stays clean.
-  const normalIdx = n - Math.floor(n / 10);
+  // Skip boss slots when cycling so the pattern stays clean.
+  const normalIdx = n - Math.floor(n / 5);
   const variantIdx = Math.floor((normalIdx - 1) / 3) % PATH_VARIANTS.length;
   const waves = generateWaves(n);
   const isK2 = state.level === 'K2';
@@ -1894,8 +2910,8 @@ function getLevelSpec(n) {
 }
 
 function generateWaves(n) {
-  // Every normal level has 8 rounds on the same map.
-  const numWaves = 8;
+  // Every normal level has 25 rounds on the same map.
+  const numWaves = 25;
   const hpBoost = Math.min(80, Math.floor(n / 5));
   const isK2 = state.level === 'K2';
   const tuning = getModeTuning();
@@ -1927,8 +2943,8 @@ function generateWaves(n) {
 }
 
 function generateBossWaves(n) {
-  const bossIdx = Math.min(BOSS_TYPES.length - 1, Math.floor(n / 10) - 1);
-  const bossHpBoost = Math.floor(n / 10) * 15;
+  const bossIdx = Math.min(BOSS_TYPES.length - 1, Math.floor(n / 5) - 1);
+  const bossHpBoost = Math.floor(n / 5) * 8;
   const minionCount = 10 + Math.floor(n / 5);
   const minions = [];
   const minionPool = [0,1,3,4];
@@ -2047,6 +3063,32 @@ const progress = {
         // Keep mistakes that are STILL in both — if cloud has it mastered, remove
         merged[k].mistakes = [...lm];
       }
+      // Merge boss rewards (rw_ keys). The `claimed` map is source of truth —
+      // it records which boss level (n) awarded which reward type. Counters
+      // and tower unlocks are re-derived from the union of claimed maps so
+      // that a user claiming different rewards on two devices gets both.
+      if (k.startsWith('rw_')) {
+        const m = merged[k], c = cloud[k];
+        const mc = m.claimed || {}, cc = c.claimed || {};
+        const unionClaimed = {};
+        for (const n of Object.keys(mc)) unionClaimed[n] = mc[n];
+        for (const n of Object.keys(cc)) if (!unionClaimed[n]) unionClaimed[n] = cc[n];
+        let lives = 0, coins = 0, fire = false, ice = false, poison = false;
+        for (const n of Object.keys(unionClaimed)) {
+          const choice = unionClaimed[n];
+          if (choice === 'extraLives') lives++;
+          else if (choice === 'extraCoins') coins++;
+          else if (choice === 'fire') fire = true;
+          else if (choice === 'ice') ice = true;
+          else if (choice === 'poison') poison = true;
+        }
+        merged[k] = {
+          extraLivesClaims: lives,
+          extraCoinsClaims: coins,
+          fire, ice, poison,
+          claimed: unionClaimed,
+        };
+      }
     }
     return merged;
   },
@@ -2091,6 +3133,44 @@ const progress = {
       if (!h.mistakes.includes(qId)) h.mistakes.push(qId);
     }
     this.save();   // fire-and-forget
+  },
+
+  // Boss rewards are permanent per (mode + grade + subject) track. Each boss
+  // level (5, 10, 15, …) allows one reward choice. Claimed rewards are
+  // recorded by level-n so replaying a boss doesn't award twice.
+  rewardsKey(lvl, subj) { return `rw_${state.mode}_${lvl}_${subj}`; },
+  getRewards(lvl, subj) {
+    if (!this.data) this.data = this._default();
+    const k = this.rewardsKey(lvl, subj);
+    if (!this.data[k]) {
+      this.data[k] = {
+        extraLivesClaims: 0,
+        extraCoinsClaims: 0,
+        fire: false, ice: false, poison: false,
+        claimed: {},
+      };
+    }
+    // Defensive: backfill missing keys if the stored shape is older.
+    const r = this.data[k];
+    if (typeof r.extraLivesClaims !== 'number') r.extraLivesClaims = 0;
+    if (typeof r.extraCoinsClaims !== 'number') r.extraCoinsClaims = 0;
+    if (!r.claimed) r.claimed = {};
+    return r;
+  },
+  hasClaimedBoss(lvl, subj, n) {
+    return !!this.getRewards(lvl, subj).claimed[n];
+  },
+  async claimReward(lvl, subj, n, choice) {
+    const r = this.getRewards(lvl, subj);
+    if (r.claimed[n]) return false; // already claimed this boss
+    r.claimed[n] = choice;
+    if (choice === 'extraLives') r.extraLivesClaims++;
+    else if (choice === 'extraCoins') r.extraCoinsClaims++;
+    else if (choice === 'fire') r.fire = true;
+    else if (choice === 'ice') r.ice = true;
+    else if (choice === 'poison') r.poison = true;
+    await this.save();
+    return true;
   },
 
   _default() { return {}; },
@@ -2260,9 +3340,14 @@ function spawnEnemy(spec) {
 
 function updateEnemies(dt) {
   const pp = getPathPoints();
+  const now = state.gameTime || 0;
   for (let i = state.enemies.length - 1; i >= 0; i--) {
     const e = state.enemies[i];
     e.wobble += dt * 6;
+    // Expire slow if duration passed
+    if (e.slowUntil && now >= e.slowUntil) {
+      e.slowAmount = 0; e.slowUntil = 0;
+    }
     const a = pp[e.segment];
     const b = pp[e.segment + 1];
     if (!b) {
@@ -2276,7 +3361,8 @@ function updateEnemies(dt) {
       continue;
     }
     const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    e.t += (e.speed * dt) / segLen;
+    const effectiveSpeed = e.speed * (1 - (e.slowAmount || 0));
+    e.t += (effectiveSpeed * dt) / segLen;
     while (e.t >= 1 && e.segment < pp.length - 1) { e.t -= 1; e.segment++; }
     const aa = pp[e.segment] || a, bb = pp[e.segment + 1] || b;
     const tt = Math.max(0, Math.min(1, e.t));
@@ -2304,11 +3390,51 @@ function updateTowers(dt) {
       if (d < rangePx && d < best) { best = d; target = e; }
     }
     if (target) {
-      state.projectiles.push({ x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color });
+      const proj = { x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color };
+      if (spec.splash) proj.splash = spec.splash * state.tileSize; // px radius
+      if (spec.slow) { proj.slow = spec.slow; proj.slowDuration = spec.slowDuration; }
+      if (spec.dotPct) { proj.dotPct = spec.dotPct; proj.dotTicks = spec.dotTicks; proj.dotInterval = spec.dotInterval; }
+      state.projectiles.push(proj);
       t.cooldown = spec.fireRate;
       audio.play('shoot');
     }
   }
+}
+
+// Apply direct damage to an enemy, handling death cleanly. Returns true if killed.
+function damageEnemy(enemy, amount, fxColor) {
+  if (!enemy || !state.enemies.includes(enemy)) return false;
+  enemy.hp -= amount;
+  if (fxColor) spawnSparkles(enemy.x, enemy.y, fxColor, 4);
+  if (enemy.hp <= 0) {
+    audio.play('defeat');
+    spawnSparkles(enemy.x, enemy.y, '#FFD66B', enemy.boss ? 28 : 14);
+    const i = state.enemies.indexOf(enemy);
+    if (i >= 0) state.enemies.splice(i, 1);
+    return true;
+  }
+  return false;
+}
+
+// Apply a slow effect, taking the strongest overlapping slow so weaker ones
+// don't overwrite a stronger one mid-duration.
+function applySlow(enemy, amount, durationMs) {
+  if (!enemy) return;
+  const now = state.gameTime || 0;
+  const newUntil = now + durationMs / 1000;
+  // Keep the stronger slow if one is already active; extend duration.
+  if (!enemy.slowAmount || amount > enemy.slowAmount) enemy.slowAmount = amount;
+  if (!enemy.slowUntil || newUntil > enemy.slowUntil) enemy.slowUntil = newUntil;
+}
+
+// Apply a DOT stack. Each new hit resets ticks to max (non-stacking — tuning choice).
+function applyDot(enemy, pct, ticks, intervalMs) {
+  if (!enemy) return;
+  enemy.dotPct = pct;
+  enemy.dotTicksLeft = ticks;
+  enemy.dotInterval = intervalMs / 1000;
+  enemy.dotTimer = enemy.dotInterval; // first tick happens after one interval
+  enemy.dotMaxHp = enemy.maxHp; // lock damage amount to max HP at time of application
 }
 
 // ============== PROJECTILES ==============
@@ -2317,18 +3443,60 @@ function updateProjectiles(dt) {
     const p = state.projectiles[i];
     p.t += dt * 5;
     if (p.t >= 1 || !p.target || !state.enemies.includes(p.target)) {
-      if (p.target && state.enemies.includes(p.target)) {
-        p.target.hp -= p.dmg;
-        spawnSparkles(p.target.x, p.target.y, p.color, 6);
-        if (p.target.hp <= 0) {
-          audio.play('defeat');
-          spawnSparkles(p.target.x, p.target.y, '#FFD66B', p.target.boss ? 28 : 14);
-          state.enemies.splice(state.enemies.indexOf(p.target), 1);
-        } else {
-          audio.play('hit');
+      const target = p.target;
+      const targetAlive = target && state.enemies.includes(target);
+      if (targetAlive) {
+        // Direct hit on the tracked target
+        const killed = damageEnemy(target, p.dmg, p.color);
+        if (!killed) audio.play('hit');
+        // Splash: damage all enemies within radius around the impact point.
+        if (p.splash) {
+          const ix = target.x, iy = target.y;
+          // Splash damage is typically reduced vs. direct hit — use 60% for secondary targets.
+          const splashDmg = Math.max(1, Math.round(p.dmg * 0.6));
+          for (const e of state.enemies.slice()) {
+            if (e === target) continue;
+            const d = Math.hypot(e.x - ix, e.y - iy);
+            if (d <= p.splash) damageEnemy(e, splashDmg, p.color);
+          }
+        }
+        // Slow effect: apply to primary target and all splash targets.
+        if (p.slow && p.slowDuration) {
+          applySlow(target, p.slow, p.slowDuration);
+          if (p.splash) {
+            const ix = target.x, iy = target.y;
+            for (const e of state.enemies) {
+              if (e === target) continue;
+              const d = Math.hypot(e.x - ix, e.y - iy);
+              if (d <= p.splash) applySlow(e, p.slow, p.slowDuration);
+            }
+          }
+        }
+        // DOT: applied to the primary target only (poison tower is single-target).
+        if (p.dotPct && p.dotTicks && state.enemies.includes(target)) {
+          applyDot(target, p.dotPct, p.dotTicks, p.dotInterval);
         }
       }
       state.projectiles.splice(i, 1);
+    }
+  }
+}
+
+// ============== DAMAGE-OVER-TIME (poison) ==============
+function updateDots(dt) {
+  for (let i = state.enemies.length - 1; i >= 0; i--) {
+    const e = state.enemies[i];
+    if (!e.dotTicksLeft || e.dotTicksLeft <= 0) continue;
+    e.dotTimer -= dt;
+    if (e.dotTimer <= 0) {
+      const tickDmg = Math.max(1, Math.round((e.dotMaxHp || e.maxHp) * e.dotPct));
+      const killed = damageEnemy(e, tickDmg, '#8BC34A');
+      if (killed) continue; // enemy already removed
+      e.dotTicksLeft--;
+      e.dotTimer += e.dotInterval;
+      if (e.dotTicksLeft <= 0) {
+        e.dotPct = 0;
+      }
     }
   }
 }
@@ -2515,7 +3683,24 @@ function drawTower(t) {
 function drawEnemy(e) {
   const bob = Math.sin(e.wobble) * 2;
   const r = state.tileSize * (e.boss ? 0.42 : 0.28);
-  drawEmojiCircle(e.x, e.y + bob, r, e.boss ? '#FFD6D6' : 'white', e.type.emoji);
+  // Tint based on active effects: poison = greenish, slow = icy blue. Poison wins if both.
+  let bg = e.boss ? '#FFD6D6' : 'white';
+  if (e.dotTicksLeft > 0) bg = '#D0F5C8';
+  else if ((e.slowAmount || 0) > 0) bg = '#D6EFFF';
+  drawEmojiCircle(e.x, e.y + bob, r, bg, e.type.emoji);
+  // Slow aura ring
+  if ((e.slowAmount || 0) > 0) {
+    ctx.strokeStyle = `rgba(2,136,209,${0.25 + e.slowAmount * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y + bob, r + 3, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Poison drip marker
+  if (e.dotTicksLeft > 0) {
+    ctx.fillStyle = '#2E7D32';
+    ctx.font = `${Math.round(r * 0.7)}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('☠', e.x + r * 0.7, e.y - r * 0.6 + bob);
+  }
   if (e.hp < e.maxHp) {
     const w = r * 2;
     ctx.fillStyle = '#FFF';
@@ -2646,6 +3831,9 @@ function openTowerPopup(tower) {
         ${statRow('⚔️ DMG', current.dmg, next?.dmg)}
         ${statRow('🎯 RANGE', current.range, next?.range)}
         ${statRow('⚡ SPEED', (1000/current.fireRate).toFixed(1), next ? (1000/next.fireRate).toFixed(1) : null, '/s')}
+        ${current.splash ? statRow('💥 SPLASH', current.splash, next?.splash, ' tile') : ''}
+        ${current.slow != null ? statRow('🐌 SLOW', Math.round(current.slow * 100), next ? Math.round(next.slow * 100) : null, '%') : ''}
+        ${current.dotPct ? statRow('☠️ POISON', `${Math.round(current.dotPct * 100)}% × ${current.dotTicks}`, next ? `${Math.round(next.dotPct * 100)}% × ${next.dotTicks}` : null) : ''}
       </div>
       <div class="tower-btns">
         ${next ? `
@@ -2714,13 +3902,40 @@ function flashHeart() {
   pill.style.animation = 'shake 0.4s';
   setTimeout(() => { pill.style.animation = ''; }, 400);
 }
+function ownedTowerKeys() {
+  // 8 base towers always available; reward towers only if unlocked for this track.
+  const base = ['bunny','bear','police','redcar','princess','panda','unicorn','owl'];
+  const keys = base.slice();
+  const r = progress.getRewards(state.level, state.subject);
+  if (r.fire) keys.push('fire');
+  if (r.ice) keys.push('ice');
+  if (r.poison) keys.push('poison');
+  return keys;
+}
+
 function buildTowerBar() {
   const bar = document.getElementById('towerBar');
   bar.innerHTML = '';
-  for (const key of Object.keys(TOWERS)) {
+  const keys = ownedTowerKeys();
+  // When we exceed 8 towers, allow horizontal scroll so icons stay tappable.
+  if (keys.length > 8) {
+    bar.style.overflowX = 'auto';
+    bar.style.justifyContent = 'flex-start';
+    bar.style.paddingLeft = '4px';
+    bar.style.paddingRight = '4px';
+  } else {
+    bar.style.overflowX = '';
+    bar.style.justifyContent = '';
+  }
+  for (const key of keys) {
     const spec = towerSpec(key, 0);
     const chip = document.createElement('div');
     chip.className = 'tower-chip'; chip.dataset.key = key;
+    // Bigger chips when scrolling (no flex:1 squeeze), fixed-ish width.
+    if (keys.length > 8) {
+      chip.style.flex = '0 0 auto';
+      chip.style.minWidth = '56px';
+    }
     chip.innerHTML = `<span class="emoji">${spec.emoji}</span><div class="cost">💰${spec.cost}</div>`;
     chip.addEventListener('click', () => {
       if (state.phase !== 'prep') { audio.play('invalid'); flashHint('Prep phase only!'); return; }
@@ -2813,19 +4028,72 @@ function checkWaveEnd() {
   }
 }
 
-// ============== STUDY PHASE (Option A: learn before being tested) ==============
+// ============== STUDY PHASE ==============
+// Study now previews the NEXT level's content so each level prepares the player
+// for what's coming. On the final level of a track (levelNum >= 500), study
+// instead reviews mastered content from the current level. The quiz itself
+// still draws from the CURRENT level's pool — study and quiz are decoupled.
+const FINAL_LEVEL_NUM = 500;
+
+function shuffleArr(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Pick study cards that preview the NEXT level (or review mastered on final level).
+// Returns {cards, mode} where mode is 'preview' | 'review' | 'none'.
+function pickStudyCards(lvl, subj, count, currentLevelNum) {
+  const h = progress.getHistory(lvl);
+  const seenSet = new Set(h.seen);
+  const mistakesSet = new Set(h.mistakes);
+
+  const isFinalLevel = currentLevelNum >= FINAL_LEVEL_NUM;
+  const fullPool = getQuestionPool(lvl, subj);
+
+  if (!isFinalLevel) {
+    // Preview next level's pool: same getQuestionPool, but filtered to ml <= N+1.
+    const nextLevelNum = currentLevelNum + 1;
+    const nextPool = fullPool.filter(q => !q.ml || q.ml <= nextLevelNum);
+    // Prefer unseen questions from next level's pool — those are what the player
+    // will actually be tested on. Avoid re-previewing mastered content here.
+    const unseen = nextPool.filter(q => q._id && !seenSet.has(q._id));
+    if (unseen.length > 0) {
+      return { cards: shuffleArr(unseen).slice(0, count), mode: 'preview' };
+    }
+    // Fallthrough: next level's pool is fully seen → offer a mastery review instead.
+  }
+
+  // Review mode: sample mastered questions (seen + not currently a mistake)
+  // from the current level's scope.
+  const currentScope = fullPool.filter(q => !q.ml || q.ml <= currentLevelNum);
+  const mastered = currentScope.filter(q =>
+    q._id && seenSet.has(q._id) && !mistakesSet.has(q._id)
+  );
+  if (mastered.length > 0) {
+    return {
+      cards: shuffleArr(mastered).slice(0, count),
+      mode: isFinalLevel ? 'review' : 'review-fallback',
+    };
+  }
+  return { cards: [], mode: 'none' };
+}
+
 function startStudyPhase() {
   state.phase = 'quiz'; // block further wave updates
   setPhaseBanner('📖 STUDY TIME', '#2B9B63');
   document.getElementById('sendWaveBtn').classList.add('hidden');
   audio.setTempo(0.85);
 
-  // Pick the questions that will be in the upcoming quiz
+  // Pick the questions that will be in the upcoming quiz (current level's pool).
   const count = state.spec.questionsPerWave[state.currentWaveIdx] || 3;
   const upcoming = pickQuestionsForQuiz(state.level, state.subject, count);
   state.quizQuestions = upcoming;
 
-  // If ALL questions in the pool are mastered — no quiz needed! Award bonus and move on.
+  // If ALL current-level questions are mastered — no quiz needed! Award bonus.
   if (upcoming.length === 0) {
     audio.play('perfect');
     state.coins += 20;
@@ -2834,20 +4102,20 @@ function startStudyPhase() {
     return;
   }
 
-  // Filter to only unseen questions (skip study for review/mastered questions)
-  const h = progress.getHistory(state.level);
-  const seenSet = new Set(h.seen);
-  const unseenCards = upcoming.filter(q => q._id && !seenSet.has(q._id));
+  // Pick study cards independently — these preview the NEXT level (or review
+  // mastered content on the final level). Study count mirrors quiz count.
+  const currentLevelNum = state.levelNum || 1;
+  const { cards: studyCards, mode: studyMode } =
+    pickStudyCards(state.level, state.subject, count, currentLevelNum);
 
-  if (unseenCards.length === 0) {
-    // All questions are review — skip straight to quiz
+  if (studyCards.length === 0) {
+    // Nothing useful to study — skip straight to the quiz.
     launchQuiz();
     return;
   }
 
-  // Show study cards for unseen questions
   audio.play('quiz');
-  showStudyCards(unseenCards, () => launchQuiz());
+  showStudyCards(studyCards, studyMode, () => launchQuiz());
 }
 
 function showMasteredSkip() {
@@ -2875,20 +4143,34 @@ function showMasteredSkip() {
   });
 }
 
-function showStudyCards(cards, onDone) {
+function showStudyCards(cards, mode, onDone) {
   const overlay = document.getElementById('quizOverlay');
   overlay.style.display = 'flex';
   let idx = 0;
 
+  // Label + subtitle depend on study mode.
+  const isKorean = state.mode === 'adults' && state.subject === 'korean';
+  const nextLevelNum = (state.levelNum || 1) + 1;
+  const nextStage = isKorean ? getKoreanStage(nextLevelNum) : null;
+  const currStage = isKorean ? getKoreanStage(state.levelNum || 1) : null;
+  let banner, subtitle;
+  if (mode === 'review' || mode === 'review-fallback') {
+    banner = '🌟 Mastery Review';
+    subtitle = mode === 'review'
+      ? 'Final level — review key concepts you\'ve mastered'
+      : (currStage ? currStage.name : 'Review what you\'ve mastered');
+  } else {
+    banner = '📖 Preview: Next Level';
+    subtitle = nextStage ? `Coming up · ${nextStage.name}` : `Preview for level ${nextLevelNum}`;
+  }
+
   function renderCard() {
     const card = cards[idx];
     const icons = ['📚','💡','🧠','✨','🎓','🌟','📖','🔑'];
-    const isKorean = state.mode === 'adults' && state.subject === 'korean';
-    const stage = isKorean ? getKoreanStage(state.levelNum) : null;
     overlay.className = 'study-overlay';
     overlay.innerHTML = `
-      <div class="study-banner">📖 Study Time!</div>
-      <div class="study-sub">${stage ? stage.name : 'Learn before the quiz'}</div>
+      <div class="study-banner">${banner}</div>
+      <div class="study-sub">${subtitle}</div>
       <div class="study-progress" id="studyPips"></div>
       <div class="study-card">
         <div class="study-icon">${icons[idx % icons.length]}</div>
@@ -3057,11 +4339,13 @@ function loop(now) {
   if (!state.running) return;
   const dt = Math.min(0.05, (now - lastT) / 1000 || 0);
   lastT = now;
+  state.gameTime = (state.gameTime || 0) + dt;
   if (state.phase === 'wave') {
     updateSpawns(dt);
     updateEnemies(dt);
     updateTowers(dt);
     updateProjectiles(dt);
+    updateDots(dt);
     checkWaveEnd();
   }
   updateSparkles(dt);
@@ -3073,11 +4357,14 @@ function loop(now) {
 function startLevel(levelNum) {
   state.levelNum = levelNum;
   state.spec = getLevelSpec(levelNum);
-  state.lives = state.spec.lives;
-  state.coins = state.spec.startCoins;
+  // Apply permanent boss rewards to this level's starting stats.
+  const rewards = progress.getRewards(state.level, state.subject);
+  state.lives = state.spec.lives + (rewards.extraLivesClaims || 0) * 2;
+  state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
   state.sparkles = []; state.spawnQueue = [];
+  state.gameTime = 0;
   state.running = true;
   state.selectedTowerType = null;
   state.totalCorrect = 0; state.totalAnswered = 0;
@@ -3162,6 +4449,83 @@ async function gameOver(win) {
     await progress.complete(state.level, state.subject, state.levelNum, stars);
   }
 
+  // If this was a boss level (won) and the reward hasn't been claimed yet, show picker first.
+  if (win && state.spec?.isBoss && !progress.hasClaimedBoss(state.level, state.subject, state.levelNum)) {
+    showBossRewardPicker(() => showLevelCompleteModal(win, stars));
+    return;
+  }
+  showLevelCompleteModal(win, stars);
+}
+
+function showBossRewardPicker(onDone) {
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  const r = progress.getRewards(state.level, state.subject);
+  const options = [
+    {
+      key: 'extraLives', emoji: '❤️', name: '+2 Starting Lives',
+      desc: 'Every level starts with 2 extra hearts. Stacks with previous picks.',
+      disabled: false,
+      ownedNote: r.extraLivesClaims ? `Already claimed ×${r.extraLivesClaims}` : '',
+    },
+    {
+      key: 'fire', emoji: '🔥', name: 'Fire Mage Tower',
+      desc: 'Splash damage on every shot. Lower single-target damage.',
+      disabled: r.fire,
+      ownedNote: r.fire ? 'Already unlocked' : '',
+    },
+    {
+      key: 'ice', emoji: '❄️', name: 'Ice Wizard Tower',
+      desc: 'Splash damage + slows monsters. +10% slow per upgrade level.',
+      disabled: r.ice,
+      ownedNote: r.ice ? 'Already unlocked' : '',
+    },
+    {
+      key: 'poison', emoji: '🧪', name: 'Poison Witch Tower',
+      desc: 'Poisons the target: 10% max HP every 0.5s for 3+ seconds.',
+      disabled: r.poison,
+      ownedNote: r.poison ? 'Already unlocked' : '',
+    },
+    {
+      key: 'extraCoins', emoji: '💰', name: '+30 Starting Coins',
+      desc: 'Every level starts with 30 extra coins. Stacks with previous picks.',
+      disabled: false,
+      ownedNote: r.extraCoinsClaims ? `Already claimed ×${r.extraCoinsClaims}` : '',
+    },
+  ];
+  modal.innerHTML = `
+    <div class="level-start-card" style="max-width:380px;">
+      <span class="mascot">👹</span>
+      <div class="reward-title">Boss Defeated!</div>
+      <div class="reward-sub">Choose your reward — this choice is permanent.</div>
+      <div class="reward-options">
+        ${options.map(o => `
+          <button class="reward-btn${o.disabled ? ' disabled' : ''}" data-key="${o.key}" ${o.disabled ? 'disabled' : ''}>
+            <span class="r-emoji">${o.emoji}</span>
+            <span class="r-body">
+              <span class="r-name">${o.name}</span>
+              <span class="r-desc">${o.desc}</span>
+              ${o.ownedNote ? `<span class="r-owned">${o.ownedNote}</span>` : ''}
+            </span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  modal.querySelectorAll('.reward-btn').forEach(btn => {
+    if (btn.classList.contains('disabled')) return;
+    btn.addEventListener('click', async () => {
+      audio.play('select');
+      const key = btn.dataset.key;
+      await progress.claimReward(state.level, state.subject, state.levelNum, key);
+      modal.style.display = 'none';
+      modal.innerHTML = '';
+      onDone();
+    });
+  });
+}
+
+function showLevelCompleteModal(win, stars) {
   const modal = document.getElementById('levelStartModal');
   modal.style.display = 'flex';
   const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
@@ -3229,7 +4593,7 @@ async function showJourneyScreen() {
   const stage = isKorean ? getKoreanStage(unlocked) : null;
   document.getElementById('journeySub').textContent = stage
     ? `Level ${unlocked} · ${stage.name}`
-    : `Level ${unlocked} of 500 · 50 boss battles`;
+    : `Level ${unlocked} of 500 · 100 boss battles`;
   renderJourneyMap(unlocked);
   // scroll to current level
   setTimeout(() => {
@@ -3300,7 +4664,7 @@ function renderJourneyMap(unlocked) {
   // Nodes
   for (const pos of positions) {
     const n = pos.n;
-    const isBoss = n % 10 === 0;
+    const isBoss = isBossLevel(n);
     const isLocked = n > unlocked;
     const isCurrent = n === unlocked;
     const stars = progress.getStars(state.level, state.subject, n);
