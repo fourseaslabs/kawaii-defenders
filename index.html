@@ -4607,7 +4607,10 @@ function renderJourneyMap(unlocked) {
   container.innerHTML = '';
 
   const total = 500;
-  const showUpTo = Math.min(total, Math.max(40, unlocked + 20));
+  // Render the full journey so the player can see everything ahead.
+  // 500 nodes × 92px spacing = ~46,000px scroll — heavy but the browser
+  // handles it fine, and users can scroll through the whole path.
+  const showUpTo = total;
 
   // Layout: sine-wave path
   const width = 300;
