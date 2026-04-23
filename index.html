@@ -536,10 +536,11 @@ body::before {
 /* Level start modal */
 .level-start { position:absolute; inset:0; z-index:90;
   background:rgba(61,46,63,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
-  display:flex; align-items:center; justify-content:center; padding:16px; }
+  display:flex; align-items:center; justify-content:center; padding:16px;
+  overflow-y:auto; }
 .level-start-card { background:white; border:4px solid var(--ink); border-radius:26px;
   padding:22px 20px; box-shadow:0 7px 0 var(--ink); max-width:320px; width:100%; text-align:center;
-  animation:popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  animation:popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); margin:auto 0; }
 .level-start-card h2 { font-family:'Fredoka',sans-serif; font-size:26px; font-weight:700; margin-bottom:4px; }
 .level-start-card .type { font-family:'Fredoka',sans-serif; font-size:12px; color:#6B4FA0;
   letter-spacing:1.5px; text-transform:uppercase; margin-bottom:12px; }
@@ -2783,6 +2784,14 @@ const TOWER_DEFS = {
     dotTicks:[6, 12],  // number of ticks (3s at L1 → 6s at L10)
     reward:true,
   },
+  cannon: {
+    name:'Sniper Cannon', emoji:'💣',
+    costs:[80, 45, 50, 58, 68, 82, 98, 115, 140, 170],
+    range:[4.5, 6.0],    // Ultra long range — furthest of any tower. L10 reaches 6 tiles.
+    dmg:[2, 12], fireRate:[1400, 700],  // Slow-firing sniper with solid damage
+    colors:['#D8CCB4','#6D4C41'], ringColor:'#4E342E',
+    reward:true,
+  },
 };
 
 function buildTowerLevels(def) {
@@ -3097,7 +3106,7 @@ const progress = {
         const unionClaimed = {};
         for (const n of Object.keys(mc)) unionClaimed[n] = mc[n];
         for (const n of Object.keys(cc)) if (!unionClaimed[n]) unionClaimed[n] = cc[n];
-        let lives = 0, coins = 0, fire = false, ice = false, poison = false;
+        let lives = 0, coins = 0, fire = false, ice = false, poison = false, cannon = false;
         for (const n of Object.keys(unionClaimed)) {
           const choice = unionClaimed[n];
           if (choice === 'extraLives') lives++;
@@ -3105,11 +3114,12 @@ const progress = {
           else if (choice === 'fire') fire = true;
           else if (choice === 'ice') ice = true;
           else if (choice === 'poison') poison = true;
+          else if (choice === 'cannon') cannon = true;
         }
         merged[k] = {
           extraLivesClaims: lives,
           extraCoinsClaims: coins,
-          fire, ice, poison,
+          fire, ice, poison, cannon,
           claimed: unionClaimed,
         };
       }
@@ -3170,7 +3180,7 @@ const progress = {
       this.data[k] = {
         extraLivesClaims: 0,
         extraCoinsClaims: 0,
-        fire: false, ice: false, poison: false,
+        fire: false, ice: false, poison: false, cannon: false,
         claimed: {},
       };
     }
@@ -3178,6 +3188,7 @@ const progress = {
     const r = this.data[k];
     if (typeof r.extraLivesClaims !== 'number') r.extraLivesClaims = 0;
     if (typeof r.extraCoinsClaims !== 'number') r.extraCoinsClaims = 0;
+    if (typeof r.cannon !== 'boolean') r.cannon = false;
     if (!r.claimed) r.claimed = {};
     return r;
   },
@@ -3193,6 +3204,7 @@ const progress = {
     else if (choice === 'fire') r.fire = true;
     else if (choice === 'ice') r.ice = true;
     else if (choice === 'poison') r.poison = true;
+    else if (choice === 'cannon') r.cannon = true;
     await this.save();
     return true;
   },
@@ -3934,6 +3946,7 @@ function ownedTowerKeys() {
   if (r.fire) keys.push('fire');
   if (r.ice) keys.push('ice');
   if (r.poison) keys.push('poison');
+  if (r.cannon) keys.push('cannon');
   return keys;
 }
 
@@ -4522,6 +4535,12 @@ function showBossRewardPicker(onDone) {
       desc: 'Poisons the target: 10% max HP every 0.5s for 3+ seconds.',
       disabled: r.poison,
       ownedNote: r.poison ? 'Already unlocked' : '',
+    },
+    {
+      key: 'cannon', emoji: '💣', name: 'Sniper Cannon Tower',
+      desc: 'Ultra long range — fires up to 6 squares away. Slow to reload.',
+      disabled: r.cannon,
+      ownedNote: r.cannon ? 'Already unlocked' : '',
     },
     {
       key: 'extraCoins', emoji: '💰', name: '+30 Starting Coins',
