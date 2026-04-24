@@ -2239,7 +2239,7 @@ function getProceduralChinese(lvl) {
     for (const [rad, mean, ex] of radicals) {
       const distractors = shuffle4(radicals.filter(x => x[0] !== rad).map(x => x[1]), r).slice(0, 3);
       const { opts, a } = buildOpts(mean, distractors, r);
-      qs.push({q:`部首 ${rad} means:`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`${rad} = ${mean}. Found in: ${ex}`});
+      qs.push({q:`${rad} is a little clue that means:`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`${rad} means ${mean}. You'll see it in: ${ex}`});
     }
     // Idioms / proverbs (simple)
     const idioms = [
@@ -2311,7 +2311,7 @@ function getProceduralChinese(lvl) {
     for (const [mean, rad] of radicalsList) {
       const distractors = shuffle4(radicalsList.filter(x => x[1] !== rad).map(x => x[1]), r).slice(0, 3);
       const { opts, a } = buildOpts(rad, distractors, r);
-      qs.push({q:`Radical for "${mean}":`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`"${mean}" radical = ${rad}.`});
+      qs.push({q:`Which small part means "${mean}"?`, opts, a, topic:"欢乐伙伴 3A · 部首", exp:`${rad} is the small part that means "${mean}".`});
     }
     _procChineseCache[lvl] = qs;
     return qs;
