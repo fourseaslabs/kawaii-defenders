@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Firestore security rules for Kawaii Defenders Academy.
+//
+// Key design:
+//  - `usernames/{usernameLower}` is a globally-readable reservation table.
+//    Anyone authenticated can read (to check availability) but only the
+//    owning uid can write, and only if the doc doesn't already exist.
+//    This is what enforces username uniqueness server-side.
+//  - `users/{uid}` holds a user's profile (username, email, etc). Only the
+//    uid-owner can read or write their own doc.
+//  - `users/{uid}/progress/*` is the private cloud-sync data (history,
+//    rewards, etc). Same ownership rules.
+//
+// DEPLOYMENT:
+//   firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Username reservations. Username doc ID = lowercase username.
+    match /usernames/{username} {
+      // Anyone signed in can check whether a username exists (for validation).
+      allow read: if request.auth != null;
+      // Only create if not already taken and the caller claims it for their
+      // own uid. `username` field on the doc must match the doc ID, lowercased.
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username is string
+        && request.resource.data.username.lower() == username
+        && username.matches('^[a-z0-9_]{3,20}$');
+      // Usernames are immutable once reserved. (Future: allow the owner to
+      // release/transfer their username via a cloud function.)
+      allow update, delete: if false;
+    }
+
+    // User profile documents (username, email, createdAt). Only the uid-owner
+    // reads/writes their own profile.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // Create only if the uid matches. Username must match a username the
+      // user has already reserved (enforced by paired transaction writes
+      // from the client — the transaction will fail if the usernames doc
+      // creation fails, so this check is a defensive secondary layer).
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.username is string
+        && request.resource.data.usernameLower is string
+        && request.resource.data.usernameLower == request.resource.data.username.lower();
+      // Updates: owner only. Username and usernameLower fields cannot change
+      // once set (changing a username would require releasing the old
+      // usernames/<old> doc first — a feature for later).
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && (!('username' in resource.data) || request.resource.data.username == resource.data.username)
+        && (!('usernameLower' in resource.data) || request.resource.data.usernameLower == resource.data.usernameLower);
+      allow delete: if false;
+    }
+
+    // Cloud-sync progress data (history, rewards, lives pool). Stored as
+    // `progress/{uid}` — one document per user containing the full serialized
+    // progress state. Only the uid-owner reads/writes their own progress.
+    match /progress/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

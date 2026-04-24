@@ -6,8 +6,8 @@
 <title>Kawaii Defenders Academy</title>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, deleteUser } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCtM6AK2iYb6Du2UABmVcvT8TcQ8wDVMH0",
@@ -30,9 +30,12 @@
   window.fbSignUp = (email, pass) => createUserWithEmailAndPassword(fbAuth, email, pass);
   window.fbSignOut = () => signOut(fbAuth);
   window.fbUpdateProfile = (user, data) => updateProfile(user, data);
+  window.fbDeleteUser = (user) => deleteUser(user);
   window.fbDoc = doc;
   window.fbGetDoc = getDoc;
   window.fbSetDoc = setDoc;
+  window.fbRunTransaction = (fn) => runTransaction(fbDb, fn);
+  window.fbServerTimestamp = serverTimestamp;
   window.fbOnAuthStateChanged = (cb) => onAuthStateChanged(fbAuth, cb);
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -640,7 +643,8 @@ body::before {
       <input type="email" id="welcomeEmail" placeholder="Email" autocomplete="email" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       <input type="password" id="welcomePass" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       <div id="welcomeNameRow" style="display:none;">
-        <input type="text" id="welcomeName" placeholder="Your name" autocomplete="name" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+        <input type="text" id="welcomeUsername" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username" maxlength="20" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+        <input type="text" id="welcomeName" placeholder="Display name (shown in-game)" autocomplete="name" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       </div>
       <button class="start-btn" id="welcomeSubmitBtn" style="width:100%;margin-bottom:8px;" onclick="doWelcomeAuth()">Sign In ✨</button>
       <div id="welcomeToggle" class="auth-toggle" onclick="toggleWelcomeMode()">Don't have an account? Sign up</div>
@@ -5148,20 +5152,78 @@ function toggleWelcomeMode() {
   document.getElementById('welcomeError').textContent = '';
 }
 
+// Username validation: 3-20 chars, alphanumeric + underscore. Case-insensitive
+// uniqueness (stored lowercased in the `usernames` collection).
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+function validateUsername(u) {
+  if (!u) return 'Username is required';
+  if (u.length < 3) return 'Username must be at least 3 characters';
+  if (u.length > 20) return 'Username must be 20 characters or fewer';
+  if (!USERNAME_RE.test(u)) return 'Username can only contain letters, numbers, and underscores';
+  return null;
+}
+
+// Reserve a username via Firestore transaction. Throws if taken.
+// Writes two documents atomically:
+//   - usernames/<lowercase> -> { uid, username, createdAt }
+//   - users/<uid>           -> { username, usernameLower, email, createdAt }
+async function reserveUsername(uid, email, username) {
+  const lower = username.toLowerCase();
+  const db = window.fbDb;
+  const usernameRef = window.fbDoc(db, 'usernames', lower);
+  const userRef = window.fbDoc(db, 'users', uid);
+  await window.fbRunTransaction(async (tx) => {
+    const existing = await tx.get(usernameRef);
+    if (existing.exists()) {
+      throw new Error('USERNAME_TAKEN');
+    }
+    tx.set(usernameRef, { uid, username, createdAt: window.fbServerTimestamp() });
+    tx.set(userRef, {
+      username, usernameLower: lower, email,
+      createdAt: window.fbServerTimestamp(),
+    }, { merge: true });
+  });
+}
+
 async function doWelcomeAuth() {
   const email = document.getElementById('welcomeEmail')?.value?.trim();
   const pass = document.getElementById('welcomePass')?.value;
   const errEl = document.getElementById('welcomeError');
   if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+
+  // Signup-specific validation: require + validate username
+  let username = null;
+  if (_welcomeMode === 'signup') {
+    username = document.getElementById('welcomeUsername')?.value?.trim();
+    const vErr = validateUsername(username);
+    if (vErr) { errEl.textContent = vErr; return; }
+  }
+
   errEl.textContent = '...';
   try {
     if (_welcomeMode === 'login') {
       await window.fbSignIn(email, pass);
     } else {
-      const name = document.getElementById('welcomeName')?.value?.trim() || email.split('@')[0];
+      // Signup: create auth user, then reserve username in a transaction.
+      // If reservation fails (username taken), delete the orphan auth user
+      // so the email isn't trapped in Firebase Auth without a user doc.
+      const displayName = document.getElementById('welcomeName')?.value?.trim() || username;
       const cred = await window.fbSignUp(email, pass);
-      await window.fbUpdateProfile(cred.user, { displayName: name });
+      try {
+        await reserveUsername(cred.user.uid, email, username);
+        await window.fbUpdateProfile(cred.user, { displayName });
+      } catch (reserveErr) {
+        // Rollback: delete the just-created auth account so the user can retry.
+        try { await window.fbDeleteUser(cred.user); } catch(_) {}
+        if (reserveErr.message === 'USERNAME_TAKEN') {
+          errEl.textContent = 'That username is already taken. Try another.';
+        } else {
+          errEl.textContent = 'Could not reserve username. Please try again.';
+          console.error('Username reservation failed:', reserveErr);
+        }
+        return;
+      }
     }
     // Auth state listener will handle the transition
   } catch(e) {
@@ -5203,11 +5265,17 @@ function showAuthModal() {
           <div class="user-avatar">🌟</div>
           <div class="user-name">${name}</div>
           <div class="user-email">${user.email}</div>
+          <div class="user-username" id="profileUsernameLine" style="font-family:'Fredoka',sans-serif;font-size:13px;color:#6B4FA0;font-weight:600;margin-bottom:10px;">@...</div>
           <div class="sync-status">☁️ Progress synced to cloud</div>
         </div>
         <button class="auth-signout" onclick="doSignOut()">Sign Out</button>
       </div>
     `;
+    // Fetch username lazily — it's in Firestore, not Auth.
+    getUserUsername(user.uid).then(u => {
+      const el = document.getElementById('profileUsernameLine');
+      if (el) el.textContent = u ? '@' + u : '';
+    });
   } else {
     showAuthForm('login');
   }
@@ -5222,7 +5290,8 @@ function showAuthForm(mode) {
       <span class="auth-close" onclick="closeAuthModal()">✕</span>
       <h2>${isLogin ? '🔑 Sign In' : '✨ Create Account'}</h2>
       <div class="auth-sub">${isLogin ? 'Welcome back! Your progress syncs across devices.' : 'Save your progress to the cloud!'}</div>
-      ${!isLogin ? '<input type="text" id="authName" placeholder="Your name" autocomplete="name">' : ''}
+      ${!isLogin ? '<input type="text" id="authUsername" maxlength="20" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username">' : ''}
+      ${!isLogin ? '<input type="text" id="authName" placeholder="Display name (shown in-game)" autocomplete="name">' : ''}
       <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
       <input type="password" id="authPass" placeholder="Password" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
       <button class="auth-submit" onclick="doAuth('${mode}')">${isLogin ? 'Sign In' : 'Create Account'}</button>
@@ -5231,7 +5300,7 @@ function showAuthForm(mode) {
     </div>
   `;
   setTimeout(() => {
-    const first = modal.querySelector(isLogin ? '#authEmail' : '#authName');
+    const first = modal.querySelector(isLogin ? '#authEmail' : '#authUsername');
     if (first) first.focus();
   }, 100);
   modal.querySelectorAll('input').forEach(inp => {
@@ -5250,14 +5319,34 @@ async function doAuth(mode) {
   const errEl = document.getElementById('authError');
   if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+
+  let username = null;
+  if (mode === 'signup') {
+    username = document.getElementById('authUsername')?.value?.trim();
+    const vErr = validateUsername(username);
+    if (vErr) { errEl.textContent = vErr; return; }
+  }
+
   errEl.textContent = '...';
   try {
     if (mode === 'login') {
       await window.fbSignIn(email, pass);
     } else {
-      const name = document.getElementById('authName')?.value?.trim() || email.split('@')[0];
+      const displayName = document.getElementById('authName')?.value?.trim() || username;
       const cred = await window.fbSignUp(email, pass);
-      await window.fbUpdateProfile(cred.user, { displayName: name });
+      try {
+        await reserveUsername(cred.user.uid, email, username);
+        await window.fbUpdateProfile(cred.user, { displayName });
+      } catch (reserveErr) {
+        try { await window.fbDeleteUser(cred.user); } catch(_) {}
+        if (reserveErr.message === 'USERNAME_TAKEN') {
+          errEl.textContent = 'That username is already taken. Try another.';
+        } else {
+          errEl.textContent = 'Could not reserve username. Please try again.';
+          console.error('Username reservation failed:', reserveErr);
+        }
+        return;
+      }
     }
     closeAuthModal();
   } catch(e) {
@@ -5294,11 +5383,100 @@ function updateAuthButton(user) {
   }
 }
 
+// Check whether a signed-in user has reserved a username. If not, they're
+// a legacy account (created before username-uniqueness was enforced).
+// Returns the username string if present, null otherwise.
+async function getUserUsername(uid) {
+  try {
+    const ref = window.fbDoc(window.fbDb, 'users', uid);
+    const snap = await window.fbGetDoc(ref);
+    if (snap.exists()) return snap.data().username || null;
+  } catch (e) {
+    console.warn('getUserUsername failed:', e);
+  }
+  return null;
+}
+
+// Modal shown to legacy users who signed up before usernames were required.
+// Blocks until they pick a valid, unique username or explicitly sign out.
+function showUsernamePickerModal(user, onDone) {
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  const suggested = (user.displayName || user.email.split('@')[0] || '')
+    .replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20);
+  modal.innerHTML = `
+    <div class="level-start-card">
+      <span class="mascot">🌟</span>
+      <h2>Choose a Username</h2>
+      <div class="info" style="margin:10px 0;">
+        Usernames are unique across all players. Pick one to continue.
+      </div>
+      <input type="text" id="pickUsernameInput" maxlength="20"
+        placeholder="3-20 chars · letters, numbers, _"
+        value="${suggested}"
+        style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+      <div class="auth-error" id="pickUsernameError" style="min-height:18px;"></div>
+      <button class="start-btn" id="pickUsernameBtn" style="width:100%;margin-top:4px;">CONFIRM ✨</button>
+      <div style="margin-top:10px;">
+        <div class="secondary-btn" style="display:inline-block;cursor:pointer;" id="pickUsernameSignOut">Sign out instead</div>
+      </div>
+    </div>
+  `;
+  const input = document.getElementById('pickUsernameInput');
+  const errEl = document.getElementById('pickUsernameError');
+  const btn = document.getElementById('pickUsernameBtn');
+  const submit = async () => {
+    const u = input.value.trim();
+    const vErr = validateUsername(u);
+    if (vErr) { errEl.textContent = vErr; return; }
+    errEl.textContent = '...';
+    btn.disabled = true;
+    try {
+      await reserveUsername(user.uid, user.email, u);
+      modal.style.display = 'none';
+      modal.innerHTML = '';
+      onDone(u);
+    } catch (e) {
+      btn.disabled = false;
+      if (e.message === 'USERNAME_TAKEN') {
+        errEl.textContent = 'That username is already taken. Try another.';
+      } else {
+        errEl.textContent = 'Could not reserve username. Please try again.';
+        console.error(e);
+      }
+    }
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  document.getElementById('pickUsernameSignOut').addEventListener('click', async () => {
+    modal.style.display = 'none'; modal.innerHTML = '';
+    if (window.fbSignOut) await window.fbSignOut();
+  });
+  input.focus();
+}
+
 function initAuth() {
   if (!window.fbOnAuthStateChanged) { setTimeout(initAuth, 500); return; }
   window.fbOnAuthStateChanged(async (user) => {
     updateAuthButton(user);
     if (user) {
+      // Check for a reserved username. Legacy accounts predate the uniqueness
+      // requirement and need to pick one before proceeding.
+      const username = await getUserUsername(user.uid);
+      if (!username) {
+        showUsernamePickerModal(user, async () => {
+          await progress.setUser(user.uid);
+          updateAuthButton(user);
+          const ws = document.getElementById('welcomeScreen');
+          if (ws && !ws.classList.contains('hidden')) {
+            const name = user.displayName || user.email.split('@')[0];
+            document.getElementById('welcomeAuthArea').style.display = 'none';
+            document.getElementById('welcomeLoggedIn').style.display = 'block';
+            document.getElementById('welcomeUserName').textContent = name;
+          }
+        });
+        return;
+      }
       await progress.setUser(user.uid);
       // If still on welcome screen, show "welcome back" UI
       const ws = document.getElementById('welcomeScreen');
