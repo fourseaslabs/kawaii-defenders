@@ -640,7 +640,7 @@ body::before {
     <div class="subtitle">Learn while you defend! 🎓🏰</div>
     <div id="welcomeAuthArea" style="width:100%;max-width:340px;margin-top:12px;">
       <div class="label" style="text-align:center;">Sign in to save your progress</div>
-      <input type="email" id="welcomeEmail" placeholder="Email" autocomplete="email" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+      <input type="text" id="welcomeEmail" placeholder="Email or username" autocomplete="username" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       <input type="password" id="welcomePass" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       <div id="welcomeNameRow" style="display:none;">
         <input type="text" id="welcomeUsername" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username" maxlength="20" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
@@ -5150,6 +5150,13 @@ function toggleWelcomeMode() {
     ? "Don't have an account? Sign up"
     : 'Already have an account? Sign in';
   document.getElementById('welcomeError').textContent = '';
+  // Swap identifier field: text+placeholder for login (accepts username), email type for signup.
+  const emailInput = document.getElementById('welcomeEmail');
+  if (emailInput) {
+    emailInput.type = isLogin ? 'text' : 'email';
+    emailInput.placeholder = isLogin ? 'Email or username' : 'Email';
+    emailInput.autocomplete = isLogin ? 'username' : 'email';
+  }
 }
 
 // Username validation: 3-20 chars, alphanumeric + underscore. Case-insensitive
@@ -5165,7 +5172,8 @@ function validateUsername(u) {
 
 // Reserve a username via Firestore transaction. Throws if taken.
 // Writes two documents atomically:
-//   - usernames/<lowercase> -> { uid, username, createdAt }
+//   - usernames/<lowercase> -> { uid, username, email, createdAt }  (email
+//     stored so that sign-in-by-username can look it up without auth)
 //   - users/<uid>           -> { username, usernameLower, email, createdAt }
 async function reserveUsername(uid, email, username) {
   const lower = username.toLowerCase();
@@ -5177,7 +5185,7 @@ async function reserveUsername(uid, email, username) {
     if (existing.exists()) {
       throw new Error('USERNAME_TAKEN');
     }
-    tx.set(usernameRef, { uid, username, createdAt: window.fbServerTimestamp() });
+    tx.set(usernameRef, { uid, username, email, createdAt: window.fbServerTimestamp() });
     tx.set(userRef, {
       username, usernameLower: lower, email,
       createdAt: window.fbServerTimestamp(),
@@ -5185,11 +5193,28 @@ async function reserveUsername(uid, email, username) {
   });
 }
 
+// Look up the email associated with a username. Returns null if the username
+// doesn't exist or the record doesn't have an email (legacy records created
+// before email was stored).
+async function lookupEmailByUsername(username) {
+  const lower = username.toLowerCase();
+  try {
+    const ref = window.fbDoc(window.fbDb, 'usernames', lower);
+    const snap = await window.fbGetDoc(ref);
+    if (!snap.exists()) return null;
+    return snap.data().email || null;
+  } catch (e) {
+    console.warn('Username lookup failed:', e);
+    return null;
+  }
+}
+
 async function doWelcomeAuth() {
-  const email = document.getElementById('welcomeEmail')?.value?.trim();
+  // On signup, 'welcomeEmail' holds the email. On login, it holds email OR username.
+  const identifier = document.getElementById('welcomeEmail')?.value?.trim();
   const pass = document.getElementById('welcomePass')?.value;
   const errEl = document.getElementById('welcomeError');
-  if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (!identifier || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
 
   // Signup-specific validation: require + validate username and name
@@ -5202,19 +5227,42 @@ async function doWelcomeAuth() {
     displayName = document.getElementById('welcomeName')?.value?.trim();
     if (!displayName) { errEl.textContent = 'Please enter your name'; return; }
     if (displayName.length > 50) { errEl.textContent = 'Name is too long (max 50 characters)'; return; }
+    // On signup, identifier MUST be an email — reject if it looks like a username.
+    if (!identifier.includes('@')) {
+      errEl.textContent = 'Please enter a valid email address';
+      return;
+    }
   }
 
   errEl.textContent = '...';
   try {
     if (_welcomeMode === 'login') {
+      // Resolve email if the identifier looks like a username (no "@").
+      let email = identifier;
+      if (!identifier.includes('@')) {
+        // Username path: reject invalid characters up front so we don't make
+        // a pointless Firestore call for something that can't be a username.
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(identifier)) {
+          errEl.textContent = 'Invalid email or username';
+          return;
+        }
+        const resolved = await lookupEmailByUsername(identifier);
+        if (!resolved) {
+          // Not found, OR legacy pre-email-storage record. Either way, can't
+          // proceed via username. Tell the user to use their email.
+          errEl.textContent = 'Username not found — try signing in with your email';
+          return;
+        }
+        email = resolved;
+      }
       await window.fbSignIn(email, pass);
     } else {
       // Signup: create auth user, then reserve username in a transaction.
       // If reservation fails (username taken), delete the orphan auth user
       // so the email isn't trapped in Firebase Auth without a user doc.
-      const cred = await window.fbSignUp(email, pass);
+      const cred = await window.fbSignUp(identifier, pass);
       try {
-        await reserveUsername(cred.user.uid, email, username);
+        await reserveUsername(cred.user.uid, identifier, username);
         await window.fbUpdateProfile(cred.user, { displayName });
       } catch (reserveErr) {
         // Rollback: delete the just-created auth account so the user can retry.
@@ -5234,7 +5282,7 @@ async function doWelcomeAuth() {
       'auth/email-already-in-use': 'Email already registered. Try signing in!',
       'auth/invalid-email': 'Invalid email address',
       'auth/weak-password': 'Password must be at least 6 characters',
-      'auth/invalid-credential': 'Wrong email or password',
+      'auth/invalid-credential': 'Wrong email/username or password',
       'auth/user-not-found': 'No account found. Try signing up!',
       'auth/wrong-password': 'Wrong password',
       'auth/too-many-requests': 'Too many attempts. Try again later',
@@ -5295,7 +5343,7 @@ function showAuthForm(mode) {
       <div class="auth-sub">${isLogin ? 'Welcome back! Your progress syncs across devices.' : 'Save your progress to the cloud!'}</div>
       ${!isLogin ? '<input type="text" id="authUsername" maxlength="20" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username">' : ''}
       ${!isLogin ? '<input type="text" id="authName" maxlength="50" placeholder="Name" autocomplete="name">' : ''}
-      <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
+      <input type="${isLogin ? 'text' : 'email'}" id="authEmail" placeholder="${isLogin ? 'Email or username' : 'Email'}" autocomplete="${isLogin ? 'username' : 'email'}">
       <input type="password" id="authPass" placeholder="Password" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
       <button class="auth-submit" onclick="doAuth('${mode}')">${isLogin ? 'Sign In' : 'Create Account'}</button>
       <div class="auth-toggle" onclick="showAuthForm('${isLogin ? 'signup' : 'login'}')">${isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}</div>
@@ -5317,10 +5365,10 @@ function closeAuthModal() {
 }
 
 async function doAuth(mode) {
-  const email = document.getElementById('authEmail')?.value?.trim();
+  const identifier = document.getElementById('authEmail')?.value?.trim();
   const pass = document.getElementById('authPass')?.value;
   const errEl = document.getElementById('authError');
-  if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (!identifier || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
 
   let username = null;
@@ -5332,16 +5380,33 @@ async function doAuth(mode) {
     displayName = document.getElementById('authName')?.value?.trim();
     if (!displayName) { errEl.textContent = 'Please enter your name'; return; }
     if (displayName.length > 50) { errEl.textContent = 'Name is too long (max 50 characters)'; return; }
+    if (!identifier.includes('@')) {
+      errEl.textContent = 'Please enter a valid email address';
+      return;
+    }
   }
 
   errEl.textContent = '...';
   try {
     if (mode === 'login') {
+      let email = identifier;
+      if (!identifier.includes('@')) {
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(identifier)) {
+          errEl.textContent = 'Invalid email or username';
+          return;
+        }
+        const resolved = await lookupEmailByUsername(identifier);
+        if (!resolved) {
+          errEl.textContent = 'Username not found — try signing in with your email';
+          return;
+        }
+        email = resolved;
+      }
       await window.fbSignIn(email, pass);
     } else {
-      const cred = await window.fbSignUp(email, pass);
+      const cred = await window.fbSignUp(identifier, pass);
       try {
-        await reserveUsername(cred.user.uid, email, username);
+        await reserveUsername(cred.user.uid, identifier, username);
         await window.fbUpdateProfile(cred.user, { displayName });
       } catch (reserveErr) {
         try { await window.fbDeleteUser(cred.user); } catch(_) {}
@@ -5360,7 +5425,7 @@ async function doAuth(mode) {
       'auth/email-already-in-use': 'Email already registered. Try signing in!',
       'auth/invalid-email': 'Invalid email address',
       'auth/weak-password': 'Password must be at least 6 characters',
-      'auth/invalid-credential': 'Wrong email or password',
+      'auth/invalid-credential': 'Wrong email/username or password',
       'auth/user-not-found': 'No account found. Try signing up!',
       'auth/wrong-password': 'Wrong password',
       'auth/too-many-requests': 'Too many attempts. Try again later',

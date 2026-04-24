@@ -18,9 +18,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Username reservations. Username doc ID = lowercase username.
+    //
+    // Reads are UNAUTHENTICATED so the sign-in flow can look up the email
+    // associated with a username before the user has been authenticated.
+    // This makes `username -> email` a publicly queryable mapping — accept
+    // as a tradeoff for the UX of username-based sign-in. A Cloud Function
+    // with rate-limiting would be the "proper" alternative.
     match /usernames/{username} {
-      // Anyone signed in can check whether a username exists (for validation).
-      allow read: if request.auth != null;
+      allow read: if true;
       // Only create if not already taken and the caller claims it for their
       // own uid. `username` field on the doc must match the doc ID, lowercased.
       allow create: if request.auth != null
