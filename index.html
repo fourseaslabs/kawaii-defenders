@@ -2940,7 +2940,7 @@ function getLevelSpec(n) {
       entry: {col:0, row:0},
       exit: {col:6, row:7},
       waves: bossWaves,
-      startCoins: Math.min(280, 110 + Math.floor(n/5) * 12),
+      startCoins: 200,
       lives: 5,
       questionsPerWave: bossWaves.map((_, i) => {
         const isLast = i === bossWaves.length - 1;
