@@ -5526,6 +5526,27 @@ function showUsernamePickerModal(user, onDone) {
   input.focus();
 }
 
+// Legacy back-fill: users who reserved a username before the email field
+// was stored on the `usernames` doc won't be able to sign in by username.
+// On successful email-sign-in, silently patch the `usernames/<lower>` doc
+// to include the user's email so future logins-by-username work.
+async function backfillUsernameEmail(user, username) {
+  if (!user || !username) return;
+  try {
+    const lower = username.toLowerCase();
+    const ref = window.fbDoc(window.fbDb, 'usernames', lower);
+    const snap = await window.fbGetDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.email) return; // already has it
+    // Use setDoc with merge so we don't overwrite uid/username/createdAt.
+    await window.fbSetDoc(ref, { email: user.email }, { merge: true });
+    console.log('Back-filled email on usernames/' + lower);
+  } catch (e) {
+    console.warn('Username back-fill failed (non-fatal):', e);
+  }
+}
+
 function initAuth() {
   if (!window.fbOnAuthStateChanged) { setTimeout(initAuth, 500); return; }
   window.fbOnAuthStateChanged(async (user) => {
@@ -5549,6 +5570,9 @@ function initAuth() {
         return;
       }
       await progress.setUser(user.uid);
+      // Back-fill the email on the usernames doc for legacy accounts reserved
+      // before email was stored there. Non-blocking — fires and forgets.
+      backfillUsernameEmail(user, username);
       // If still on welcome screen, show "welcome back" UI
       const ws = document.getElementById('welcomeScreen');
       if (ws && !ws.classList.contains('hidden')) {

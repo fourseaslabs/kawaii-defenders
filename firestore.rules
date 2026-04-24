@@ -33,9 +33,15 @@ service cloud.firestore {
         && request.resource.data.username is string
         && request.resource.data.username.lower() == username
         && username.matches('^[a-z0-9_]{3,20}$');
-      // Usernames are immutable once reserved. (Future: allow the owner to
-      // release/transfer their username via a cloud function.)
-      allow update, delete: if false;
+      // Allow the owning uid to update ONLY to add/change the email field
+      // (and the timestamp). This is used for legacy-account back-fill where
+      // the email field wasn't stored at reservation time. The uid and
+      // username fields are still immutable.
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.username == resource.data.username;
+      allow delete: if false;
     }
 
     // User profile documents (username, email, createdAt). Only the uid-owner
