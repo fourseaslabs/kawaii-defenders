@@ -69,9 +69,13 @@ service cloud.firestore {
 
     // Cloud-sync progress data (history, rewards, lives pool). Stored as
     // `progress/{uid}` — one document per user containing the full serialized
-    // progress state. Only the uid-owner reads/writes their own progress.
+    // progress state. Only the uid-owner reads/writes their own progress,
+    // EXCEPT the admin email which can read/write any progress doc.
     match /progress/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if request.auth != null && (
+        request.auth.uid == uid ||
+        request.auth.token.email == 'stareminent@gmail.com'
+      );
     }
   }
 }

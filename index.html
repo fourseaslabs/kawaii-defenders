@@ -617,6 +617,42 @@ body::before {
   font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; cursor:pointer;
   box-shadow:0 3px 0 var(--ink); background:#FFD6D6; color:var(--ink); margin-top:8px; }
 .auth-signout:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+
+/* Admin panel */
+.admin-overlay { position:fixed; inset:0; z-index:400; background:rgba(20,10,30,0.7);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  display:none; align-items:flex-start; justify-content:center; padding:20px;
+  overflow-y:auto; }
+.admin-overlay.visible { display:flex; }
+.admin-card { background:white; border:4px solid var(--ink); border-radius:20px;
+  padding:18px; max-width:440px; width:100%; font-family:'Nunito',sans-serif;
+  box-shadow:0 6px 0 var(--ink); margin:auto 0; }
+.admin-card h2 { font-family:'Fredoka',sans-serif; font-weight:700; font-size:22px;
+  color:var(--ink); margin:0 0 4px; }
+.admin-card .admin-sub { font-size:13px; color:#7A6A7C; margin-bottom:12px; }
+.admin-card input, .admin-card select {
+  width:100%; padding:8px 12px; border:2px solid var(--ink); border-radius:10px;
+  font-family:'Fredoka',sans-serif; font-size:14px; font-weight:500;
+  box-sizing:border-box; outline:none; margin-bottom:8px; background:white; }
+.admin-card button { width:100%; padding:10px; border:3px solid var(--ink); border-radius:12px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:14px; cursor:pointer;
+  box-shadow:0 3px 0 var(--ink); background:var(--peach); color:var(--ink); margin-top:6px; }
+.admin-card button:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+.admin-card button.danger { background:#FFD6D6; }
+.admin-card button.neutral { background:var(--cream); }
+.admin-section { margin-top:14px; padding-top:12px; border-top:2px dashed #D5CEC4; }
+.admin-section h3 { font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px;
+  color:var(--ink); margin:0 0 8px; }
+.admin-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; font-size:13px; }
+.admin-row label { flex:1; color:#4A3D4C; }
+.admin-row input[type="number"] { width:70px; margin:0; padding:6px 8px; font-size:13px; }
+.admin-row input[type="checkbox"] { width:auto; margin:0; }
+.admin-msg { font-size:12px; color:#2B9B63; min-height:16px; margin-top:8px;
+  font-family:'Fredoka',sans-serif; font-weight:600; }
+.admin-msg.err { color:#C0392B; }
+.admin-close-row { display:flex; justify-content:flex-end; margin-bottom:6px; }
+.admin-close-btn { background:none; border:none; font-size:22px; cursor:pointer;
+  padding:0; width:auto; box-shadow:none; }
 </style>
 </head>
 <body>
@@ -729,6 +765,7 @@ body::before {
 
   <!-- Auth modal -->
   <div class="auth-modal" id="authModal" style="display:none;"></div>
+  <div class="admin-overlay" id="adminOverlay"></div>
 </div>
 
 <script>
@@ -5566,6 +5603,221 @@ async function backfillUsernameEmail(user, username) {
   }
 }
 
+// ============== ADMIN PANEL ==============
+// Gated by email. Client-side check is UX only; real security is in the
+// Firestore rules which also check the admin email on writes to
+// progress/{uid} for any uid.
+const ADMIN_EMAILS = ['stareminent@gmail.com'];
+function isAdmin(user) {
+  if (!user || !user.email) return false;
+  return ADMIN_EMAILS.includes(user.email.toLowerCase());
+}
+
+// Track templates — drives the per-track edit UI.
+const ADMIN_TRACKS = [
+  { mode: 'kids', level: 'K2', subject: 'math' },
+  { mode: 'kids', level: 'K2', subject: 'english' },
+  { mode: 'kids', level: 'K2', subject: 'chinese' },
+  { mode: 'kids', level: 'K2', subject: 'mixed' },
+  { mode: 'kids', level: 'P1', subject: 'math' },
+  { mode: 'kids', level: 'P1', subject: 'english' },
+  { mode: 'kids', level: 'P1', subject: 'chinese' },
+  { mode: 'kids', level: 'P1', subject: 'mixed' },
+  { mode: 'kids', level: 'P2', subject: 'math' },
+  { mode: 'kids', level: 'P2', subject: 'english' },
+  { mode: 'kids', level: 'P2', subject: 'chinese' },
+  { mode: 'kids', level: 'P2', subject: 'mixed' },
+  { mode: 'kids', level: 'P3', subject: 'math' },
+  { mode: 'kids', level: 'P3', subject: 'english' },
+  { mode: 'kids', level: 'P3', subject: 'chinese' },
+  { mode: 'kids', level: 'P3', subject: 'mixed' },
+  { mode: 'adults', level: 'beginner', subject: 'korean' },
+];
+
+let _adminTargetUid = null;
+let _adminTargetData = null; // full progress doc data
+
+function closeAdminPanel() {
+  const ov = document.getElementById('adminOverlay');
+  ov.classList.remove('visible');
+  ov.innerHTML = '';
+  _adminTargetUid = null;
+  _adminTargetData = null;
+  // Clear the #admin hash without reloading.
+  if (window.location.hash === '#admin') {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+function openAdminPanel() {
+  const user = window.fbAuth?.currentUser;
+  if (!isAdmin(user)) {
+    alert('Admin access required.');
+    return;
+  }
+  renderAdminLookup();
+}
+
+function renderAdminLookup() {
+  const ov = document.getElementById('adminOverlay');
+  ov.classList.add('visible');
+  ov.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-close-row">
+        <button class="admin-close-btn" onclick="closeAdminPanel()">✕</button>
+      </div>
+      <h2>🛠️ Admin</h2>
+      <div class="admin-sub">Look up a user by their username and edit their progress.</div>
+      <input type="text" id="adminLookupInput" placeholder="Username (e.g. luboyboy)" maxlength="20" autocomplete="off">
+      <button onclick="doAdminLookup()">Look up user</button>
+      <div class="admin-msg" id="adminLookupMsg"></div>
+    </div>
+  `;
+  setTimeout(() => {
+    const inp = document.getElementById('adminLookupInput');
+    if (inp) {
+      inp.focus();
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLookup(); });
+    }
+  }, 50);
+}
+
+async function doAdminLookup() {
+  const username = document.getElementById('adminLookupInput')?.value?.trim();
+  const msg = document.getElementById('adminLookupMsg');
+  if (!username) { msg.textContent = 'Enter a username'; msg.classList.add('err'); return; }
+  msg.textContent = 'Looking up…';
+  msg.classList.remove('err');
+  try {
+    const lower = username.toLowerCase();
+    const uRef = window.fbDoc(window.fbDb, 'usernames', lower);
+    const uSnap = await window.fbGetDoc(uRef);
+    if (!uSnap.exists()) {
+      msg.textContent = 'Username not found'; msg.classList.add('err'); return;
+    }
+    const uid = uSnap.data().uid;
+    const email = uSnap.data().email || '(no email on record)';
+    const pRef = window.fbDoc(window.fbDb, 'progress', uid);
+    const pSnap = await window.fbGetDoc(pRef);
+    const data = pSnap.exists() ? (pSnap.data().data || {}) : {};
+    _adminTargetUid = uid;
+    _adminTargetData = data;
+    renderAdminEdit(username, email);
+  } catch (e) {
+    console.error(e);
+    msg.textContent = 'Lookup failed: ' + (e.message || e.code || 'unknown');
+    msg.classList.add('err');
+  }
+}
+
+function renderAdminEdit(username, email) {
+  const ov = document.getElementById('adminOverlay');
+  const data = _adminTargetData || {};
+  const trackRows = ADMIN_TRACKS.map(t => {
+    const pKey = `${t.mode}_${t.level}_${t.subject}`;
+    const rKey = `rw_${t.mode}_${t.level}_${t.subject}`;
+    const p = data[pKey] || {};
+    const r = data[rKey] || {};
+    const unlocked = p.unlocked || 1;
+    const pool = typeof r.livesPool === 'number' ? r.livesPool : 10;
+    const coins = r.extraCoinsClaims || 0;
+    const label = `${t.level === 'beginner' ? 'Korean' : t.level + ' ' + t.subject}`;
+    return `
+      <div style="border:2px solid var(--ink);border-radius:10px;padding:8px 10px;margin-bottom:6px;background:var(--cream);">
+        <div style="font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;margin-bottom:4px;">${label}</div>
+        <div class="admin-row">
+          <label>Unlocked up to</label>
+          <input type="number" min="1" max="500" value="${unlocked}" data-edit-key="unlocked" data-track="${pKey}">
+        </div>
+        <div class="admin-row">
+          <label>Lives pool</label>
+          <input type="number" min="0" max="9999" value="${pool}" data-edit-key="livesPool" data-track="${rKey}">
+        </div>
+        <div class="admin-row">
+          <label>Extra coins claims</label>
+          <input type="number" min="0" max="999" value="${coins}" data-edit-key="extraCoinsClaims" data-track="${rKey}">
+        </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="fire" data-track="${rKey}" ${r.fire?'checked':''}> Fire tower</label>
+          <label><input type="checkbox" data-edit-key="ice" data-track="${rKey}" ${r.ice?'checked':''}> Ice tower</label>
+        </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="poison" data-track="${rKey}" ${r.poison?'checked':''}> Poison tower</label>
+          <label><input type="checkbox" data-edit-key="cannon" data-track="${rKey}" ${r.cannon?'checked':''}> Cannon tower</label>
+        </div>
+      </div>
+    `;
+  }).join('');
+  ov.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-close-row">
+        <button class="admin-close-btn" onclick="closeAdminPanel()">✕</button>
+      </div>
+      <h2>🛠️ Editing: ${username}</h2>
+      <div class="admin-sub">${email}<br>uid: <code style="font-size:11px;">${_adminTargetUid}</code></div>
+      <button class="neutral" onclick="renderAdminLookup()">← Look up someone else</button>
+      <div class="admin-section">
+        <h3>Tracks</h3>
+        ${trackRows}
+      </div>
+      <button onclick="doAdminSave()">Save changes</button>
+      <div class="admin-msg" id="adminSaveMsg"></div>
+    </div>
+  `;
+}
+
+async function doAdminSave() {
+  const msg = document.getElementById('adminSaveMsg');
+  msg.textContent = 'Saving…'; msg.classList.remove('err');
+  try {
+    // Apply all edits to a mutable copy of the current data.
+    const data = JSON.parse(JSON.stringify(_adminTargetData || {}));
+    document.querySelectorAll('[data-edit-key]').forEach(el => {
+      const key = el.dataset.editKey;
+      const trackKey = el.dataset.track;
+      if (!data[trackKey]) {
+        // Initialize bucket with sensible defaults based on key type.
+        if (trackKey.startsWith('rw_')) {
+          data[trackKey] = {
+            extraLivesClaims: 0, extraCoinsClaims: 0,
+            fire: false, ice: false, poison: false, cannon: false,
+            claimed: {}, livesPool: 10, livesPoolUpdatedAt: Date.now(),
+          };
+        } else {
+          data[trackKey] = { unlocked: 1, stars: {} };
+        }
+      }
+      if (el.type === 'checkbox') {
+        data[trackKey][key] = el.checked;
+      } else {
+        const v = parseInt(el.value, 10);
+        if (!isNaN(v)) {
+          data[trackKey][key] = v;
+          // Bump timestamp when livesPool changes so multi-device merge picks us.
+          if (key === 'livesPool') data[trackKey].livesPoolUpdatedAt = Date.now();
+        }
+      }
+    });
+    const ref = window.fbDoc(window.fbDb, 'progress', _adminTargetUid);
+    await window.fbSetDoc(ref, { data, updatedAt: Date.now() }, { merge: true });
+    _adminTargetData = data;
+    msg.textContent = '✓ Saved. Target user will see changes on next sign-in or cloud pull.';
+    msg.classList.remove('err');
+  } catch (e) {
+    console.error(e);
+    msg.textContent = 'Save failed: ' + (e.message || e.code || 'unknown');
+    msg.classList.add('err');
+  }
+}
+
+// Open admin panel via URL hash (#admin) when signed in as admin.
+function checkAdminHash() {
+  if (window.location.hash === '#admin' && isAdmin(window.fbAuth?.currentUser)) {
+    openAdminPanel();
+  }
+}
+window.addEventListener('hashchange', checkAdminHash);
+
 function initAuth() {
   if (!window.fbOnAuthStateChanged) { setTimeout(initAuth, 500); return; }
   window.fbOnAuthStateChanged(async (user) => {
@@ -5592,6 +5844,8 @@ function initAuth() {
       // Back-fill the email on the usernames doc for legacy accounts reserved
       // before email was stored there. Non-blocking — fires and forgets.
       backfillUsernameEmail(user, username);
+      // If the URL is #admin and this user is admin, open the panel.
+      checkAdminHash();
       // If still on welcome screen, show "welcome back" UI
       const ws = document.getElementById('welcomeScreen');
       if (ws && !ws.classList.contains('hidden')) {
