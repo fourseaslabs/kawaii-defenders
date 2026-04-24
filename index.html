@@ -71,13 +71,23 @@ body::before {
 #app { position:relative; width:100vw; height:100vh; height:100dvh; overflow:hidden; z-index:2; }
 
 /* HUD */
-.hud { position:absolute; top:0; left:0; right:0; padding:10px 12px;
-  display:flex; justify-content:space-between; align-items:center; gap:6px; z-index:10; }
-.hud-pill { background:white; border:3px solid var(--ink); border-radius:999px; padding:5px 12px;
-  font-family:'Fredoka',sans-serif; font-weight:600; font-size:14px;
-  box-shadow:0 3px 0 var(--ink); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.hud { position:absolute; top:0; left:0; right:0; padding:8px 10px;
+  display:flex; justify-content:space-between; align-items:center; gap:5px; z-index:10;
+  flex-wrap:nowrap; }
+.hud-pill { background:white; border:3px solid var(--ink); border-radius:999px; padding:4px 10px;
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:14px;
+  box-shadow:0 3px 0 var(--ink); display:flex; align-items:center; gap:3px; white-space:nowrap;
+  flex-shrink:0; /* Pills never shrink — full text stays visible */ }
 .hud-pill.lives{color:#D14D6A;} .hud-pill.coins{color:#D19700;} .hud-pill.wave{color:#6B4FA0;}
-.hud-pill.level{color:#2B9B63;}
+.hud-pill.level{color:#2B9B63; overflow:hidden; text-overflow:ellipsis; min-width:0; flex-shrink:1; }
+/* Narrow screens: shrink padding, font, and icon sizing so all four items fit. */
+@media (max-width: 400px) {
+  .hud { padding:6px 5px; gap:3px; }
+  .hud-pill { padding:3px 7px; font-size:12px; border-width:2px; box-shadow:0 2px 0 var(--ink); }
+}
+@media (max-width: 340px) {
+  .hud-pill { padding:3px 6px; font-size:11px; gap:2px; }
+}
 
 #gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
 
