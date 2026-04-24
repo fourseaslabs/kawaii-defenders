@@ -3230,7 +3230,7 @@ const progress = {
     const before = bucket.unlocked;
     bucket.unlocked = Math.max(1, before - 5);
     const r = this.getRewards(lvl, subj);
-    r.livesPool = 10;
+    r.livesPool = STARTING_LIVES_POOL;
     r.livesPoolUpdatedAt = Date.now();
     await this.save();
     return { unlockedBefore: before, unlockedAfter: bucket.unlocked };
@@ -3272,7 +3272,7 @@ const progress = {
         extraCoinsClaims: 0,
         fire: false, ice: false, poison: false, cannon: false,
         claimed: {},
-        livesPool: 10,
+        livesPool: STARTING_LIVES_POOL,
         livesPoolUpdatedAt: Date.now(),
       };
     }
@@ -4535,6 +4535,9 @@ function loop(now) {
 }
 
 // ============== START / END LEVEL ==============
+// New tracks start with this many lives in their persistent pool.
+// Legacy pools (migrated from the old per-level model) are not affected.
+const STARTING_LIVES_POOL = 50;
 function startLevel(levelNum) {
   state.levelNum = levelNum;
   state.spec = getLevelSpec(levelNum);
@@ -4671,7 +4674,7 @@ function showGameOverRewindModal(result) {
       <div class="type">${state.level === 'beginner' ? '초급 (TOPIK I)' : state.level} · ${getSubjectLabel(state.subject)}</div>
       <div class="info" style="margin:14px 0;">
         Don't worry — your rewards and stars are safe! 💖<br><br>
-        Your lives have been refilled to <b>❤️ 10</b>, and you've been
+        Your lives have been refilled to <b>❤️ ${STARTING_LIVES_POOL}</b>, and you've been
         sent back <b>5 levels</b> so you can warm up again.<br><br>
         <span style="font-size:13px;color:#6B4FA0;">
           Unlocked: <b>Level ${unlockedBefore}</b> → <b>Level ${unlockedAfter}</b>
@@ -5781,7 +5784,7 @@ async function doAdminSave() {
           data[trackKey] = {
             extraLivesClaims: 0, extraCoinsClaims: 0,
             fire: false, ice: false, poison: false, cannon: false,
-            claimed: {}, livesPool: 10, livesPoolUpdatedAt: Date.now(),
+            claimed: {}, livesPool: STARTING_LIVES_POOL, livesPoolUpdatedAt: Date.now(),
           };
         } else {
           data[trackKey] = { unlocked: 1, stars: {} };
