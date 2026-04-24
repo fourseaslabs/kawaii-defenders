@@ -644,7 +644,7 @@ body::before {
       <input type="password" id="welcomePass" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       <div id="welcomeNameRow" style="display:none;">
         <input type="text" id="welcomeUsername" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username" maxlength="20" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
-        <input type="text" id="welcomeName" placeholder="Display name (shown in-game)" autocomplete="name" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
+        <input type="text" id="welcomeName" placeholder="Name" autocomplete="name" maxlength="50" style="width:100%;padding:10px 14px;border:3px solid var(--ink);border-radius:14px;font-family:'Fredoka',sans-serif;font-size:15px;font-weight:500;margin-bottom:10px;box-sizing:border-box;outline:none;">
       </div>
       <button class="start-btn" id="welcomeSubmitBtn" style="width:100%;margin-bottom:8px;" onclick="doWelcomeAuth()">Sign In ✨</button>
       <div id="welcomeToggle" class="auth-toggle" onclick="toggleWelcomeMode()">Don't have an account? Sign up</div>
@@ -5192,12 +5192,16 @@ async function doWelcomeAuth() {
   if (!email || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
 
-  // Signup-specific validation: require + validate username
+  // Signup-specific validation: require + validate username and name
   let username = null;
+  let displayName = null;
   if (_welcomeMode === 'signup') {
     username = document.getElementById('welcomeUsername')?.value?.trim();
     const vErr = validateUsername(username);
     if (vErr) { errEl.textContent = vErr; return; }
+    displayName = document.getElementById('welcomeName')?.value?.trim();
+    if (!displayName) { errEl.textContent = 'Please enter your name'; return; }
+    if (displayName.length > 50) { errEl.textContent = 'Name is too long (max 50 characters)'; return; }
   }
 
   errEl.textContent = '...';
@@ -5208,7 +5212,6 @@ async function doWelcomeAuth() {
       // Signup: create auth user, then reserve username in a transaction.
       // If reservation fails (username taken), delete the orphan auth user
       // so the email isn't trapped in Firebase Auth without a user doc.
-      const displayName = document.getElementById('welcomeName')?.value?.trim() || username;
       const cred = await window.fbSignUp(email, pass);
       try {
         await reserveUsername(cred.user.uid, email, username);
@@ -5291,7 +5294,7 @@ function showAuthForm(mode) {
       <h2>${isLogin ? '🔑 Sign In' : '✨ Create Account'}</h2>
       <div class="auth-sub">${isLogin ? 'Welcome back! Your progress syncs across devices.' : 'Save your progress to the cloud!'}</div>
       ${!isLogin ? '<input type="text" id="authUsername" maxlength="20" placeholder="Username (3-20 chars, letters/numbers/_)" autocomplete="username">' : ''}
-      ${!isLogin ? '<input type="text" id="authName" placeholder="Display name (shown in-game)" autocomplete="name">' : ''}
+      ${!isLogin ? '<input type="text" id="authName" maxlength="50" placeholder="Name" autocomplete="name">' : ''}
       <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
       <input type="password" id="authPass" placeholder="Password" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
       <button class="auth-submit" onclick="doAuth('${mode}')">${isLogin ? 'Sign In' : 'Create Account'}</button>
@@ -5321,10 +5324,14 @@ async function doAuth(mode) {
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
 
   let username = null;
+  let displayName = null;
   if (mode === 'signup') {
     username = document.getElementById('authUsername')?.value?.trim();
     const vErr = validateUsername(username);
     if (vErr) { errEl.textContent = vErr; return; }
+    displayName = document.getElementById('authName')?.value?.trim();
+    if (!displayName) { errEl.textContent = 'Please enter your name'; return; }
+    if (displayName.length > 50) { errEl.textContent = 'Name is too long (max 50 characters)'; return; }
   }
 
   errEl.textContent = '...';
@@ -5332,7 +5339,6 @@ async function doAuth(mode) {
     if (mode === 'login') {
       await window.fbSignIn(email, pass);
     } else {
-      const displayName = document.getElementById('authName')?.value?.trim() || username;
       const cred = await window.fbSignUp(email, pass);
       try {
         await reserveUsername(cred.user.uid, email, username);
