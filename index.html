@@ -3096,31 +3096,53 @@ const progress = {
         // Keep mistakes that are STILL in both — if cloud has it mastered, remove
         merged[k].mistakes = [...lm];
       }
-      // Merge boss rewards (rw_ keys). The `claimed` map is source of truth —
-      // it records which boss level (n) awarded which reward type. Counters
-      // and tower unlocks are re-derived from the union of claimed maps so
-      // that a user claiming different rewards on two devices gets both.
+      // Merge boss rewards (rw_ keys). Two-part strategy:
+      //
+      // 1) The `claimed` map is source of truth for one-time boss rewards
+      //    (tower unlocks). Counters are derived from the union so that a
+      //    user claiming different rewards on two devices gets both.
+      //
+      // 2) `livesPool` is mutated every time the player loses a heart during
+      //    play. Tracking per-heart deltas across devices is infeasible, so we
+      //    use last-write-wins via `livesPoolUpdatedAt`. The coin counter is
+      //    a claim-driven counter (re-derived from the union).
       if (k.startsWith('rw_')) {
         const m = merged[k], c = cloud[k];
         const mc = m.claimed || {}, cc = c.claimed || {};
         const unionClaimed = {};
         for (const n of Object.keys(mc)) unionClaimed[n] = mc[n];
         for (const n of Object.keys(cc)) if (!unionClaimed[n]) unionClaimed[n] = cc[n];
-        let lives = 0, coins = 0, fire = false, ice = false, poison = false, cannon = false;
+        let coins = 0, fire = false, ice = false, poison = false, cannon = false;
+        // Note: extraLives is no longer a counter — +10 reward goes directly
+        // into livesPool. Old claims of 'extraLives' already contributed when
+        // they were made; we don't re-add them here.
         for (const n of Object.keys(unionClaimed)) {
           const choice = unionClaimed[n];
-          if (choice === 'extraLives') lives++;
-          else if (choice === 'extraCoins') coins++;
+          if (choice === 'extraCoins') coins++;
           else if (choice === 'fire') fire = true;
           else if (choice === 'ice') ice = true;
           else if (choice === 'poison') poison = true;
           else if (choice === 'cannon') cannon = true;
         }
+        // livesPool: take whichever side has the newer timestamp. If the cloud
+        // side has never been migrated (no timestamp), fall back to local.
+        const mTs = m.livesPoolUpdatedAt || 0;
+        const cTs = c.livesPoolUpdatedAt || 0;
+        const winner = cTs > mTs ? c : m;
+        // Re-count any extraCoins claims re-fought after rewind (tracked in
+        // extraCoinsClaims but not in claimed[] — take the max of the two).
+        const extraCoinsClaims = Math.max(
+          m.extraCoinsClaims || 0,
+          c.extraCoinsClaims || 0,
+          coins  // lower bound from claimed map
+        );
         merged[k] = {
-          extraLivesClaims: lives,
-          extraCoinsClaims: coins,
+          extraLivesClaims: 0, // retired — always zero going forward
+          extraCoinsClaims,
           fire, ice, poison, cannon,
           claimed: unionClaimed,
+          livesPool: winner.livesPool != null ? winner.livesPool : 10,
+          livesPoolUpdatedAt: Math.max(mTs, cTs, Date.now()),
         };
       }
     }
@@ -3144,6 +3166,23 @@ const progress = {
     bucket.unlocked = Math.max(bucket.unlocked, n + 1);
     bucket.stars[n] = Math.max(bucket.stars[n] || 0, stars);
     await this.save();
+  },
+  // Called when the player loses all lives. Preserves stars, rewards, and claimed
+  // boss rewards, but rolls back the unlocked counter by 5 levels (min 1) and
+  // resets the lives pool to 10. The player must replay those levels to get
+  // back to where they were. Any boss levels in that replay window that were
+  // already claimed will show a limited re-fight picker.
+  async gameOverRewind(lvl, subj) {
+    const k = this.key(lvl, subj);
+    if (!this.data[k]) this.data[k] = { unlocked: 1, stars: {} };
+    const bucket = this.data[k];
+    const before = bucket.unlocked;
+    bucket.unlocked = Math.max(1, before - 5);
+    const r = this.getRewards(lvl, subj);
+    r.livesPool = 10;
+    r.livesPoolUpdatedAt = Date.now();
+    await this.save();
+    return { unlockedBefore: before, unlockedAfter: bucket.unlocked };
   },
 
   // Question history per grade level (P1/P2/P3). Mixed mode questions are
@@ -3182,6 +3221,8 @@ const progress = {
         extraCoinsClaims: 0,
         fire: false, ice: false, poison: false, cannon: false,
         claimed: {},
+        livesPool: 10,
+        livesPoolUpdatedAt: Date.now(),
       };
     }
     // Defensive: backfill missing keys if the stored shape is older.
@@ -3190,7 +3231,25 @@ const progress = {
     if (typeof r.extraCoinsClaims !== 'number') r.extraCoinsClaims = 0;
     if (typeof r.cannon !== 'boolean') r.cannon = false;
     if (!r.claimed) r.claimed = {};
+    // Migration: older saves used `extraLivesClaims × 2` applied at level start.
+    // Convert to a persistent pool of 10 + (claims × 10), then retire the counter.
+    // The counter stays at 0 going forward; live pool is the source of truth.
+    if (typeof r.livesPool !== 'number') {
+      r.livesPool = 10 + (r.extraLivesClaims || 0) * 10;
+      r.extraLivesClaims = 0;
+      r.livesPoolUpdatedAt = Date.now();
+      this.save(); // persist migration
+    }
+    if (typeof r.livesPoolUpdatedAt !== 'number') r.livesPoolUpdatedAt = Date.now();
     return r;
+  },
+  // Mutate the persistent lives pool. Delta can be negative (lose lives during play)
+  // or positive (claim +10 lives reward, or game-over reset to 10).
+  async setLivesPool(lvl, subj, newValue) {
+    const r = this.getRewards(lvl, subj);
+    r.livesPool = Math.max(0, newValue);
+    r.livesPoolUpdatedAt = Date.now();
+    await this.save();
   },
   hasClaimedBoss(lvl, subj, n) {
     return !!this.getRewards(lvl, subj).claimed[n];
@@ -3199,12 +3258,31 @@ const progress = {
     const r = this.getRewards(lvl, subj);
     if (r.claimed[n]) return false; // already claimed this boss
     r.claimed[n] = choice;
-    if (choice === 'extraLives') r.extraLivesClaims++;
+    if (choice === 'extraLives') {
+      r.livesPool = (r.livesPool || 10) + 10;
+      r.livesPoolUpdatedAt = Date.now();
+    }
     else if (choice === 'extraCoins') r.extraCoinsClaims++;
     else if (choice === 'fire') r.fire = true;
     else if (choice === 'ice') r.ice = true;
     else if (choice === 'poison') r.poison = true;
     else if (choice === 'cannon') r.cannon = true;
+    await this.save();
+    return true;
+  },
+  // Re-fighting a previously-claimed boss after game-over rewind. Only +gold or
+  // +lives are allowed (towers were permanently unlocked the first time). The
+  // original `claimed[n]` entry stays as-is; we track re-fight rewards via a
+  // parallel claimedRefight counter on the reward shape.
+  async claimRefightReward(lvl, subj, n, choice) {
+    const r = this.getRewards(lvl, subj);
+    if (choice !== 'extraLives' && choice !== 'extraCoins') return false;
+    if (choice === 'extraLives') {
+      r.livesPool = (r.livesPool || 10) + 10;
+      r.livesPoolUpdatedAt = Date.now();
+    } else {
+      r.extraCoinsClaims++;
+    }
     await this.save();
     return true;
   },
@@ -3389,6 +3467,8 @@ function updateEnemies(dt) {
     if (!b) {
       const damage = e.boss ? 3 : 1;
       state.lives = Math.max(0, state.lives - damage);
+      // Persist to the track's lives pool on every heart lost.
+      progress.setLivesPool(state.level, state.subject, state.lives);
       state.enemies.splice(i, 1);
       updateHUD();
       flashHeart();
@@ -4407,9 +4487,11 @@ function loop(now) {
 function startLevel(levelNum) {
   state.levelNum = levelNum;
   state.spec = getLevelSpec(levelNum);
-  // Apply permanent boss rewards to this level's starting stats.
+  // Use the persistent cross-level lives pool for this track. The per-level
+  // spec.lives is now ignored — all tracks share the same pool mechanic.
   const rewards = progress.getRewards(state.level, state.subject);
-  state.lives = state.spec.lives + (rewards.extraLivesClaims || 0) * 2;
+  state.lives = rewards.livesPool;
+  state.livesAtStart = state.lives; // snapshot for star calculation
   state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
@@ -4459,6 +4541,10 @@ function showLevelStartModal(onStart) {
   const mapLabel = s.isBoss ? 'Boss Arena' : mapNames[s.variant];
   const isKorean = state.mode === 'adults' && state.subject === 'korean';
   const stage = isKorean ? getKoreanStage(s.n) : null;
+  // Lives come from the persistent track pool now, not from spec.lives.
+  const rewards = progress.getRewards(state.level, state.subject);
+  const startingLives = rewards.livesPool;
+  const startingCoins = s.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   modal.innerHTML = `
     <div class="level-start-card">
       <span class="mascot">${s.isBoss ? '👹' : (stage ? stage.emoji : '🌸')}</span>
@@ -4467,8 +4553,8 @@ function showLevelStartModal(onStart) {
       ${stage ? `<div style="font-family:'Fredoka',sans-serif;font-size:14px;color:#6B4FA0;font-weight:700;margin:6px 0;">${stage.name}</div><div style="font-family:'Fredoka',sans-serif;font-size:12px;color:#7A6A7C;margin-bottom:8px;">${stage.desc}</div>` : ''}
       <div class="info">
         ${s.isBoss
-          ? `Build a maze of towers to slow the monsters!<br>You <b>can't fully block</b> the path.<br>🌊 <b>${s.waves.length} rounds</b> — boss arrives in the final round · 💰${s.startCoins} · ❤️${s.lives}`
-          : `<b>${s.waves.length} rounds</b> on this map — add more towers between each round!<br>💰${s.startCoins} to start · ❤️${s.lives} lives`
+          ? `Build a maze of towers to slow the monsters!<br>You <b>can't fully block</b> the path.<br>🌊 <b>${s.waves.length} rounds</b> — boss arrives in the final round · 💰${startingCoins} · ❤️${startingLives}`
+          : `<b>${s.waves.length} rounds</b> on this map — add more towers between each round!<br>💰${startingCoins} to start · ❤️${startingLives} lives (pool)`
         }
       </div>
       <button class="start-btn" id="beginBtn">LET'S GO ✨</button>
@@ -4489,74 +4575,127 @@ async function gameOver(win) {
   audio.stopMusic();
   audio.play(win ? 'victory' : 'defeat_game');
 
-  // Calculate stars (0-3) based on lives remaining + quiz accuracy
+  // Calculate stars (0-3) based on HEARTS LOST this level + quiz accuracy.
+  // Under persistent lives, using remaining life count would reward players
+  // who just stacked +10 rewards and say nothing about this level's play.
   let stars = 0;
   if (win) {
     stars = 1;
     const acc = state.totalAnswered ? state.totalCorrect / state.totalAnswered : 1;
-    if (acc >= 0.6 && state.lives >= 3) stars = 2;
-    if (acc >= 0.9 && state.lives >= 4) stars = 3;
+    const livesLost = (state.livesAtStart || state.lives) - state.lives;
+    if (acc >= 0.6 && livesLost <= 2) stars = 2;
+    if (acc >= 0.9 && livesLost <= 1) stars = 3;
     await progress.complete(state.level, state.subject, state.levelNum, stars);
   }
 
-  // If this was a boss level (won) and the reward hasn't been claimed yet, show picker first.
-  if (win && state.spec?.isBoss && !progress.hasClaimedBoss(state.level, state.subject, state.levelNum)) {
-    showBossRewardPicker(() => showLevelCompleteModal(win, stars));
+  // Game-over rewind: player ran out of lives in the track's persistent pool.
+  // Rewind the unlocked counter by 5, reset pool to 10, preserve everything else.
+  if (!win) {
+    const result = await progress.gameOverRewind(state.level, state.subject);
+    showGameOverRewindModal(result);
+    return;
+  }
+
+  // Boss reward picker. Three modes:
+  //   - first-time win on a boss: all 6 options available
+  //   - re-fight of a boss that was claimed before (after rewind): only
+  //     +gold and +lives available; other towers already unlocked
+  //   - non-boss level: skip picker, go to level-complete modal
+  if (win && state.spec?.isBoss) {
+    const isRefight = progress.hasClaimedBoss(state.level, state.subject, state.levelNum);
+    showBossRewardPicker(isRefight, () => showLevelCompleteModal(win, stars));
     return;
   }
   showLevelCompleteModal(win, stars);
 }
 
-function showBossRewardPicker(onDone) {
+function showGameOverRewindModal(result) {
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  const { unlockedBefore, unlockedAfter } = result;
+  modal.innerHTML = `
+    <div class="level-start-card">
+      <span class="mascot">💔</span>
+      <h2>Out of Lives!</h2>
+      <div class="type">${state.level === 'beginner' ? '초급 (TOPIK I)' : state.level} · ${getSubjectLabel(state.subject)}</div>
+      <div class="info" style="margin:14px 0;">
+        Don't worry — your rewards and stars are safe! 💖<br><br>
+        Your lives have been refilled to <b>❤️ 10</b>, and you've been
+        sent back <b>5 levels</b> so you can warm up again.<br><br>
+        <span style="font-size:13px;color:#6B4FA0;">
+          Unlocked: <b>Level ${unlockedBefore}</b> → <b>Level ${unlockedAfter}</b>
+        </span>
+      </div>
+      <button class="start-btn" id="rewindBtn">BACK TO MAP 🗺️</button>
+    </div>
+  `;
+  document.getElementById('rewindBtn').addEventListener('click', async () => {
+    audio.play('click');
+    modal.style.display = 'none'; modal.innerHTML = '';
+    hideGameplayUI();
+    await showJourneyScreen();
+  });
+}
+
+function showBossRewardPicker(isRefight, onDone) {
   const modal = document.getElementById('levelStartModal');
   modal.style.display = 'flex';
   const r = progress.getRewards(state.level, state.subject);
-  const options = [
+  const allOptions = [
     {
-      key: 'extraLives', emoji: '❤️', name: '+2 Starting Lives',
-      desc: 'Every level starts with 2 extra hearts. Stacks with previous picks.',
-      disabled: false,
-      ownedNote: r.extraLivesClaims ? `Already claimed ×${r.extraLivesClaims}` : '',
+      key: 'extraLives', emoji: '❤️', name: '+10 Lives',
+      desc: 'Add 10 lives to your pool. Lives carry over between levels.',
+      available: true,
     },
     {
       key: 'fire', emoji: '🔥', name: 'Fire Mage Tower',
       desc: 'Splash damage on every shot. Lower single-target damage.',
-      disabled: r.fire,
+      available: !isRefight && !r.fire,
       ownedNote: r.fire ? 'Already unlocked' : '',
     },
     {
       key: 'ice', emoji: '❄️', name: 'Ice Wizard Tower',
       desc: 'Splash damage + slows monsters. +10% slow per upgrade level.',
-      disabled: r.ice,
+      available: !isRefight && !r.ice,
       ownedNote: r.ice ? 'Already unlocked' : '',
     },
     {
       key: 'poison', emoji: '🧪', name: 'Poison Witch Tower',
       desc: 'Poisons the target: 10% max HP every 0.5s for 3+ seconds.',
-      disabled: r.poison,
+      available: !isRefight && !r.poison,
       ownedNote: r.poison ? 'Already unlocked' : '',
     },
     {
       key: 'cannon', emoji: '💣', name: 'Sniper Cannon Tower',
       desc: 'Ultra long range — fires up to 6 squares away. Slow to reload.',
-      disabled: r.cannon,
+      available: !isRefight && !r.cannon,
       ownedNote: r.cannon ? 'Already unlocked' : '',
     },
     {
       key: 'extraCoins', emoji: '💰', name: '+30 Starting Coins',
       desc: 'Every level starts with 30 extra coins. Stacks with previous picks.',
-      disabled: false,
+      available: true,
       ownedNote: r.extraCoinsClaims ? `Already claimed ×${r.extraCoinsClaims}` : '',
     },
   ];
+  // On re-fight, hide tower options entirely. On first fight, show everything
+  // with disabled state for towers already owned.
+  const options = isRefight
+    ? allOptions.filter(o => o.key === 'extraLives' || o.key === 'extraCoins')
+    : allOptions;
+  const subtitle = isRefight
+    ? 'Re-fight reward — towers already unlocked, pick +lives or +gold.'
+    : 'Choose your reward — tower picks are permanent.';
   modal.innerHTML = `
     <div class="level-start-card" style="max-width:380px;">
       <span class="mascot">👹</span>
-      <div class="reward-title">Boss Defeated!</div>
-      <div class="reward-sub">Choose your reward — this choice is permanent.</div>
+      <div class="reward-title">${isRefight ? 'Boss Beaten Again!' : 'Boss Defeated!'}</div>
+      <div class="reward-sub">${subtitle}</div>
       <div class="reward-options">
-        ${options.map(o => `
-          <button class="reward-btn${o.disabled ? ' disabled' : ''}" data-key="${o.key}" ${o.disabled ? 'disabled' : ''}>
+        ${options.map(o => {
+          const disabled = !o.available;
+          return `
+          <button class="reward-btn${disabled ? ' disabled' : ''}" data-key="${o.key}" ${disabled ? 'disabled' : ''}>
             <span class="r-emoji">${o.emoji}</span>
             <span class="r-body">
               <span class="r-name">${o.name}</span>
@@ -4564,7 +4703,8 @@ function showBossRewardPicker(onDone) {
               ${o.ownedNote ? `<span class="r-owned">${o.ownedNote}</span>` : ''}
             </span>
           </button>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -4573,7 +4713,11 @@ function showBossRewardPicker(onDone) {
     btn.addEventListener('click', async () => {
       audio.play('select');
       const key = btn.dataset.key;
-      await progress.claimReward(state.level, state.subject, state.levelNum, key);
+      if (isRefight) {
+        await progress.claimRefightReward(state.level, state.subject, state.levelNum, key);
+      } else {
+        await progress.claimReward(state.level, state.subject, state.levelNum, key);
+      }
       modal.style.display = 'none';
       modal.innerHTML = '';
       onDone();
