@@ -3123,6 +3123,15 @@ const progress = {
     const merged = {...this._default(), ...local};
     for (const k of Object.keys(cloud)) {
       if (!merged[k]) { merged[k] = cloud[k]; continue; }
+      // Session keys: last-saved-wins by savedAt timestamp. Sessions are
+      // per-device but if the user plays on two devices we take whichever
+      // device's session is fresher.
+      if (k.startsWith('session_')) {
+        const lTs = merged[k].savedAt || 0;
+        const cTs = cloud[k].savedAt || 0;
+        if (cTs > lTs) merged[k] = cloud[k];
+        continue;
+      }
       // Merge unlocked/stars (level progress)
       if (cloud[k].unlocked != null) {
         if (!merged[k].unlocked) merged[k] = cloud[k];
@@ -3336,6 +3345,30 @@ const progress = {
     }
     await this.save();
     return true;
+  },
+
+  // ===== Level session persistence (Option C mid-level resume) =====
+  // Snapshots a PRE-WAVE or BETWEEN-WAVES state. Mid-wave quits roll back
+  // to the pre-wave snapshot — enemies/projectiles aren't serialized because
+  // persistent `livesPool` was already decremented on heart-loss; the
+  // snapshot captures `livesPool` as it was before the wave started, and
+  // resume restores it.
+  sessionKey(lvl, subj) { return `session_${state.mode}_${lvl}_${subj}`; },
+  getSession(lvl, subj) {
+    return this.data && this.data[this.sessionKey(lvl, subj)] || null;
+  },
+  async saveSession(session) {
+    const k = this.sessionKey(session.level, session.subject);
+    session.savedAt = Date.now();
+    this.data[k] = session;
+    await this.save();
+  },
+  async clearSession(lvl, subj) {
+    const k = this.sessionKey(lvl, subj);
+    if (this.data[k]) {
+      delete this.data[k];
+      await this.save();
+    }
   },
 
   _default() { return {}; },
@@ -3969,6 +4002,7 @@ function onCanvasPointer(e) {
   updateHUD();
   if (state.coins < spec.cost) state.selectedTowerType = null;
   updateTowerBar();
+  persistSession();
 }
 canvas.addEventListener('click', onCanvasPointer);
 
@@ -4026,6 +4060,7 @@ function openTowerPopup(tower) {
       audio.play('upgrade');
       spawnSparkles(tower.x, tower.y, '#FFD66B', 16);
       updateHUD();
+      persistSession();
       closeTowerPopup();
     });
   }
@@ -4036,6 +4071,7 @@ function openTowerPopup(tower) {
     state.towers.splice(state.towers.indexOf(tower), 1);
     if (state.spec?.isBoss) recomputeBossPath();
     updateHUD();
+    persistSession();
     closeTowerPopup();
   });
   document.getElementById('closePopupBtn').addEventListener('click', () => {
@@ -4176,6 +4212,9 @@ function enterPrepPhase() {
   } else {
     flashHint(`Round ${roundNum} coming! Add more towers or upgrade existing ones.`);
   }
+  // Persist session at the start of every prep phase — this is the clean
+  // resume point (no live enemies, coins/lives are settled).
+  persistSession();
 }
 function startWave() {
   state.phase = 'wave';
@@ -4538,14 +4577,125 @@ function loop(now) {
 // New tracks start with this many lives in their persistent pool.
 // Legacy pools (migrated from the old per-level model) are not affected.
 const STARTING_LIVES_POOL = 50;
-function startLevel(levelNum) {
+
+// Build a snapshot of the current level state suitable for resume. Captures
+// only PREP-phase-safe fields — towers, wave index, coins, quiz tallies.
+// We don't capture enemies/projectiles/quiz UI; those reset on resume.
+function buildSessionSnapshot() {
+  if (!state.spec) return null;
+  // Snapshot tower placements. We need type + level + grid position; x/y are
+  // recomputed from col/row × tileSize on rehydrate so they survive canvas
+  // resizes between sessions.
+  const towers = (state.towers || []).map(t => ({
+    type: t.type, level: t.level, col: t.col, row: t.row,
+  }));
+  return {
+    mode: state.mode,
+    level: state.level,
+    subject: state.subject,
+    levelNum: state.levelNum,
+    currentWaveIdx: state.currentWaveIdx || 0,
+    coins: state.coins,
+    livesAtStart: state.livesAtStart,
+    totalCorrect: state.totalCorrect || 0,
+    totalAnswered: state.totalAnswered || 0,
+    towers,
+    bossPath: state.spec.isBoss && state.bossPath ? state.bossPath.slice() : null,
+  };
+}
+
+// Fire-and-forget persist of the current session. Safe to call often.
+// Debounced internally so rapid events (tower placements) don't spam Firestore.
+let _sessionSaveTimer = null;
+function persistSession() {
+  if (!state.spec || state.phase === 'end') return;
+  const snap = buildSessionSnapshot();
+  if (!snap) return;
+  // Write to localStorage synchronously-ish via progress.data (progress.save
+  // debounces Firestore writes internally). Clear any pending timer and schedule.
+  if (_sessionSaveTimer) clearTimeout(_sessionSaveTimer);
+  _sessionSaveTimer = setTimeout(() => {
+    progress.saveSession(snap).catch(e => console.warn('session save failed', e));
+  }, 300);
+}
+
+// Synchronous flush used by beforeunload. Writes straight to progress.data +
+// localStorage. Firestore push is fire-and-forget via save() — may not
+// complete before the page unloads, but localStorage is enough for same-device
+// resume.
+function flushSessionSync() {
+  if (!state.spec || state.phase === 'end') return;
+  const snap = buildSessionSnapshot();
+  if (!snap) return;
+  try {
+    if (_sessionSaveTimer) { clearTimeout(_sessionSaveTimer); _sessionSaveTimer = null; }
+    snap.savedAt = Date.now();
+    const k = `session_${snap.mode}_${snap.level}_${snap.subject}`;
+    if (progress.data) progress.data[k] = snap;
+    localStorage.setItem('kd_progress_v1', JSON.stringify(progress.data));
+    // Fire-and-forget cloud push. Very likely to race the unload but we try.
+    if (progress._uid) progress._pushCloud();
+  } catch (e) { /* ignore — unloading anyway */ }
+}
+window.addEventListener('beforeunload', flushSessionSync);
+// pagehide is more reliable on iOS Safari when switching apps.
+window.addEventListener('pagehide', flushSessionSync);
+
+// Rehydrate a saved session onto the current state object. Returns true on
+// success. Filters out invalid towers (tiles that are now path, or tower
+// types that no longer exist) defensively.
+function rehydrateSession(session) {
+  try {
+    state.currentWaveIdx = Math.max(0, Math.min(session.currentWaveIdx || 0, (state.spec.waves || []).length - 1));
+    state.coins = session.coins ?? state.coins;
+    state.livesAtStart = session.livesAtStart ?? state.livesAtStart;
+    state.totalCorrect = session.totalCorrect || 0;
+    state.totalAnswered = session.totalAnswered || 0;
+    if (session.bossPath && state.spec.isBoss) {
+      state.bossPath = session.bossPath.slice();
+    }
+    // Restore towers. Recompute x/y from col/row because tileSize may have
+    // changed between sessions (device rotation, window resize).
+    state.towers = [];
+    for (const t of (session.towers || [])) {
+      if (!TOWERS[t.type]) continue; // unknown tower type — skip
+      if (typeof t.col !== 'number' || typeof t.row !== 'number') continue;
+      // Validate the tile is still valid (not path, within bounds) on the
+      // current layout. Path variants may have changed between sessions.
+      if (typeof isPathCell === 'function' && isPathCell(t.col, t.row)) continue;
+      if (state.spec.isBoss && typeof canPlaceInBoss === 'function' && !canPlaceInBoss(t.col, t.row)) continue;
+      const ts = state.tileSize || 48;
+      state.towers.push({
+        type: t.type,
+        level: Math.max(0, Math.min(9, t.level || 0)),
+        col: t.col, row: t.row,
+        x: (t.col + 0.5) * ts,
+        y: (t.row + 0.5) * ts,
+        cooldown: 0,
+      });
+    }
+    return true;
+  } catch (e) {
+    console.warn('Session rehydrate failed:', e);
+    return false;
+  }
+}
+
+function startLevel(levelNum, opts = {}) {
   state.levelNum = levelNum;
   state.spec = getLevelSpec(levelNum);
-  // Use the persistent cross-level lives pool for this track. The per-level
-  // spec.lives is now ignored — all tracks share the same pool mechanic.
   const rewards = progress.getRewards(state.level, state.subject);
+
+  // Check for a saved session on this track at this level. If found (and the
+  // caller didn't explicitly request a fresh start), rehydrate.
+  const session = progress.getSession(state.level, state.subject);
+  const canResume = !opts.fresh
+    && session
+    && session.mode === state.mode
+    && session.levelNum === levelNum;
+
   state.lives = rewards.livesPool;
-  state.livesAtStart = state.lives; // snapshot for star calculation
+  state.livesAtStart = state.lives;
   state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
@@ -4557,16 +4707,33 @@ function startLevel(levelNum) {
   state.bossPath = null;
 
   if (state.spec.isBoss) recomputeBossPath();
-  flowerCache = null; // regenerate flowers for new layout
+  flowerCache = null;
 
   audio.init(); audio.resume();
   audio.startMusic();
 
   showGameplayUI();
+
+  // Rehydrate session state AFTER defaults are set, so we override only
+  // what the session captured.
+  let resumed = false;
+  if (canResume) {
+    resumed = rehydrateSession(session);
+  }
+
   updateHUD();
   buildTowerBar();
 
-  // Show intro modal
+  if (resumed) {
+    // Skip the intro modal on resume — player is mid-level, not starting over.
+    enterPrepPhase();
+    lastT = performance.now();
+    flashHint(`Resumed round ${state.currentWaveIdx + 1} — continue where you left off! ✨`);
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  // Normal fresh-start flow: intro modal, then prep.
   showLevelStartModal(() => {
     enterPrepPhase();
     lastT = performance.now();
@@ -4640,11 +4807,14 @@ async function gameOver(win) {
     if (acc >= 0.6 && livesLost <= 2) stars = 2;
     if (acc >= 0.9 && livesLost <= 1) stars = 3;
     await progress.complete(state.level, state.subject, state.levelNum, stars);
+    // Session no longer needed — level is done.
+    await progress.clearSession(state.level, state.subject);
   }
 
   // Game-over rewind: player ran out of lives in the track's persistent pool.
-  // Rewind the unlocked counter by 5, reset pool to 10, preserve everything else.
+  // Rewind the unlocked counter by 5, reset pool, preserve everything else.
   if (!win) {
+    await progress.clearSession(state.level, state.subject);
     const result = await progress.gameOverRewind(state.level, state.subject);
     showGameOverRewindModal(result);
     return;
@@ -5164,6 +5334,9 @@ document.getElementById('journeyBackBtn').addEventListener('click', () => {
 });
 document.getElementById('backBtn').addEventListener('click', async () => {
   audio.play('click');
+  // Flush any pending session save before we leave — this is the main way
+  // players will "quit mid-level" and we want to resume cleanly.
+  if (state.spec && state.phase !== 'end') flushSessionSync();
   audio.stopMusic();
   state.running = false;
   state.phase = 'menu';
