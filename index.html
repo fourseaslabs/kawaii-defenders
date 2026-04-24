@@ -4782,6 +4782,9 @@ function hideGameplayUI() {
   document.getElementById('hud').style.display = 'none';
   document.getElementById('towerBar').style.display = 'none';
   document.getElementById('soundControls').style.display = 'none';
+  // Restore auth button when not in gameplay (welcome / journey screens).
+  const authBtn = document.getElementById('authBtn');
+  if (authBtn && authBtn.dataset.hasAuth === '1') authBtn.style.display = 'flex';
   setPhaseBanner(null);
 }
 function showGameplayUI() {
@@ -4790,6 +4793,10 @@ function showGameplayUI() {
   document.getElementById('soundControls').style.display = 'flex';
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('journeyScreen').classList.add('hidden');
+  // Hide the auth button during gameplay — it overlaps the coin pill in the
+  // top-right corner. Users can still access their profile from other screens.
+  const authBtn = document.getElementById('authBtn');
+  if (authBtn) authBtn.style.display = 'none';
 }
 
 async function showJourneyScreen() {
@@ -5304,7 +5311,9 @@ async function doWelcomeAuth() {
 function skipToModeScreen() {
   document.getElementById('welcomeScreen').classList.add('hidden');
   document.getElementById('modeScreen').classList.remove('hidden');
-  document.getElementById('authBtn').style.display = 'flex';
+  const authBtn = document.getElementById('authBtn');
+  authBtn.style.display = 'flex';
+  authBtn.dataset.hasAuth = '1';
 }
 
 // Enter key on welcome inputs
