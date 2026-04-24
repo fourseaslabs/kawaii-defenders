@@ -4664,13 +4664,14 @@ function rehydrateSession(session) {
       // current layout. Path variants may have changed between sessions.
       if (typeof isPathCell === 'function' && isPathCell(t.col, t.row)) continue;
       if (state.spec.isBoss && typeof canPlaceInBoss === 'function' && !canPlaceInBoss(t.col, t.row)) continue;
-      const ts = state.tileSize || 48;
+      // Use cellCenter to honor gridOffX/gridOffY — placing relative to raw
+      // (col * tileSize) clusters all towers at the canvas origin.
+      const c = cellCenter(t.col, t.row);
       state.towers.push({
         type: t.type,
         level: Math.max(0, Math.min(9, t.level || 0)),
         col: t.col, row: t.row,
-        x: (t.col + 0.5) * ts,
-        y: (t.row + 0.5) * ts,
+        x: c.x, y: c.y,
         cooldown: 0,
       });
     }
