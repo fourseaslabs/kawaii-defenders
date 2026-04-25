@@ -6350,6 +6350,12 @@ function launchQuiz() {
   state.quizIndex = 0;
   state.quizCorrect = 0;
   state.quizResults = [];
+  // Questions the user got wrong this quiz get queued for one re-ask at the
+  // end. Tracked separately from quizQuestions so first-attempt accuracy
+  // (which feeds totalAnswered/totalCorrect/quizResults) stays clean.
+  state.quizRetryQueue = [];
+  state.quizInRetryPhase = false;
+  state.quizRetryIndex = 0;
   setPhaseBanner('🎓 QUIZ ROUND', '#6B4FA0');
   audio.play('quiz');
   renderQuizQuestion();
@@ -6357,40 +6363,64 @@ function launchQuiz() {
 function renderQuizQuestion() {
   const overlay = document.getElementById('quizOverlay');
   overlay.style.display = 'flex';
-  const q = state.quizQuestions[state.quizIndex];
-  const total = state.quizQuestions.length;
-  const idx = state.quizIndex;
+  const inRetry = state.quizInRetryPhase;
+  // Source the question from the right list depending on phase.
+  const q = inRetry ? state.quizRetryQueue[state.quizRetryIndex] : state.quizQuestions[state.quizIndex];
+  const total = inRetry ? state.quizRetryQueue.length : state.quizQuestions.length;
+  const idx = inRetry ? state.quizRetryIndex : state.quizIndex;
   const emojis = ['🐰','🐻','🚓','🚗','👸','🐼','🦄','🦉'];
   const towerEmoji = emojis[idx % emojis.length];
   const totalRounds = state.spec.waves.length;
   const roundNum = state.currentWaveIdx + 1;
-  // Show review badge if this question is in the user's mistakes pile
+  // Show review badge if this question is in the user's mistakes pile (cross-quiz).
+  // In retry phase, show a different badge — "🔄 Retry" — to make the second-chance
+  // nature obvious.
   const isReview = q._id && progress.isMistake(state.level, q._id);
+  const banner = inRetry
+    ? `🔄 Retry ${idx + 1}/${total} — second chance!`
+    : `🎓 Round ${roundNum}/${totalRounds} Quiz`;
+  const progressLabel = inRetry
+    ? `Retry ${idx + 1} of ${total}`
+    : `Question ${idx + 1} of ${total}`;
   overlay.innerHTML = `
-    <div class="quiz-banner">🎓 Round ${roundNum}/${totalRounds} Quiz</div>
-    <div class="quiz-progress">Question ${idx+1} of ${total}</div>
+    <div class="quiz-banner" style="${inRetry ? 'background:#FFB347;' : ''}">${banner}</div>
+    <div class="quiz-progress">${progressLabel}</div>
     <div class="quiz-dots" id="quizDots"></div>
     <div class="question-card">
-      ${isReview ? '<div class="q-review">🔁 REVIEW · You missed this one before!</div>' : ''}
+      ${inRetry ? '<div class="q-review" style="background:#FFE5B4;">🔄 RETRY · Show what you learned!</div>'
+                : (isReview ? '<div class="q-review">🔁 REVIEW · You missed this one before!</div>' : '')}
       <div class="q-tower">${towerEmoji}</div>
       <div class="q-subject">${state.level} · ${getSubjectLabel(state.subject)}</div>
       ${q.topic ? `<div class="q-source">📖 ${q.topic}</div>` : ''}
       <div class="q-text">${q.q}</div>
-      ${(isReview && q.exp) ? `<button class="hint-btn" id="hintBtn">💡 Show Hint</button><div class="hint-reveal" id="hintReveal" style="display:none;">💡 ${q.exp}</div>` : ''}
+      ${(isReview && q.exp && !inRetry) ? `<button class="hint-btn" id="hintBtn">💡 Show Hint</button><div class="hint-reveal" id="hintReveal" style="display:none;">💡 ${q.exp}</div>` : ''}
       <div class="q-options">
         ${q.opts.map((o,i) => `<button class="q-option" data-i="${i}">${o}</button>`).join('')}
       </div>
     </div>
   `;
+  // Dots only render for the main phase — retry phase uses its own progress label.
   const dotsEl = document.getElementById('quizDots');
-  for (let i = 0; i < total; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'quiz-dot';
-    if (i < state.quizResults.length) dot.classList.add(state.quizResults[i] ? 'done' : 'wrong');
-    else if (i === state.quizIndex) dot.classList.add('current');
-    dotsEl.appendChild(dot);
+  if (!inRetry) {
+    for (let i = 0; i < total; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'quiz-dot';
+      if (i < state.quizResults.length) dot.classList.add(state.quizResults[i] ? 'done' : 'wrong');
+      else if (i === state.quizIndex) dot.classList.add('current');
+      dotsEl.appendChild(dot);
+    }
+  } else {
+    // In retry phase: simple "Retry N of M" indicator dots
+    for (let i = 0; i < total; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'quiz-dot';
+      if (i < state.quizRetryIndex) dot.classList.add('done');
+      else if (i === state.quizRetryIndex) dot.classList.add('current');
+      dotsEl.appendChild(dot);
+    }
   }
-  // Hint button for review questions
+  // Hint button for cross-quiz review questions (not retry-phase — retries
+  // already showed the explanation when they were missed earlier).
   const hintBtn = document.getElementById('hintBtn');
   if (hintBtn) {
     hintBtn.addEventListener('click', () => {
@@ -6404,36 +6434,47 @@ function renderQuizQuestion() {
       const i = +btn.dataset.i;
       overlay.querySelectorAll('.q-option').forEach(b => b.style.pointerEvents = 'none');
       const correct = i === q.a;
-      state.quizResults.push(correct);
-      state.totalAnswered++;
-      // Record in history for smart picker — won't be re-asked unless they got it wrong
-      if (q._id) progress.recordAnswer(state.level, q._id, correct);
+      // Main-phase tracking: counts toward stars/coins, records to history.
+      // Retry-phase tracking: only adjusts the cross-quiz mistakes set, does NOT
+      // count toward star/coin totals (those reflect first-attempt accuracy).
+      if (!inRetry) {
+        state.quizResults.push(correct);
+        state.totalAnswered++;
+        if (q._id) progress.recordAnswer(state.level, q._id, correct);
+      }
       if (correct) {
         btn.classList.add('correct');
         audio.play('correct');
-        state.quizCorrect++;
-        state.totalCorrect++;
-        // Brief positive feedback then auto-advance — the player got it
-        // right and doesn't need extra time to study the explanation.
-        setTimeout(() => {
-          state.quizIndex++;
-          if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
-          else renderQuizQuestion();
-        }, 650);
+        if (!inRetry) {
+          state.quizCorrect++;
+          state.totalCorrect++;
+        } else if (q._id) {
+          // Got it right on the retry — graduate it out of the cross-quiz
+          // mistakes pile so it stops showing up. recordAnswer with correct=true
+          // does exactly this (removes from mistakes, leaves seen alone if
+          // already there).
+          progress.recordAnswer(state.level, q._id, true);
+        }
+        setTimeout(() => { advanceQuiz(); }, 650);
       } else {
         btn.classList.add('wrong');
         audio.play('wrong');
         const cb = overlay.querySelector(`.q-option[data-i="${q.a}"]`);
         if (cb) cb.classList.add('correct');
-        // Show the correct answer + explanation so the user learns. Wait
-        // for the user to tap Continue — auto-advancing made it impossible
-        // to actually read the explanation, especially on long ones or
-        // for younger readers.
+        // Queue this question for retry — but only if we're in main phase and
+        // haven't queued it already. If already in retry phase, no further
+        // retries (cap at 1 retry — looping a stuck kid is demoralizing).
+        if (!inRetry && q._id && !state.quizRetryQueue.some(rq => rq._id === q._id)) {
+          state.quizRetryQueue.push(q);
+        }
         const reveal = document.createElement('div');
         reveal.className = 'correct-reveal';
         reveal.innerHTML = `
           ✅ Correct answer: <b>${q.opts[q.a]}</b>
           ${q.exp ? `<span class="exp-text">💡 ${q.exp}</span>` : ''}
+          ${(!inRetry && state.quizRetryQueue.length > 0)
+            ? `<span class="exp-text" style="color:#A0522D;">🔄 You'll see this again at the end.</span>`
+            : ''}
           <button class="continue-btn" id="quizContinueBtn">Continue →</button>
         `;
         const card = overlay.querySelector('.question-card');
@@ -6442,16 +6483,41 @@ function renderQuizQuestion() {
         if (contBtn) {
           contBtn.addEventListener('click', () => {
             audio.play('click');
-            state.quizIndex++;
-            if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
-            else renderQuizQuestion();
+            advanceQuiz();
           });
-          // Autofocus so Enter/space also works on keyboard.
           contBtn.focus();
         }
       }
     });
   });
+}
+
+// Single advance helper used by both correct (auto-timeout) and wrong (Continue
+// tap) paths. Handles the main → retry → summary transition.
+function advanceQuiz() {
+  if (!state.quizInRetryPhase) {
+    state.quizIndex++;
+    if (state.quizIndex < state.quizQuestions.length) {
+      renderQuizQuestion();
+      return;
+    }
+    // Main phase done. If there are retries queued, switch into retry phase.
+    if (state.quizRetryQueue.length > 0) {
+      state.quizInRetryPhase = true;
+      state.quizRetryIndex = 0;
+      renderQuizQuestion();
+      return;
+    }
+    showQuizSummary();
+    return;
+  }
+  // In retry phase
+  state.quizRetryIndex++;
+  if (state.quizRetryIndex < state.quizRetryQueue.length) {
+    renderQuizQuestion();
+  } else {
+    showQuizSummary();
+  }
 }
 function showQuizSummary() {
   const overlay = document.getElementById('quizOverlay');
