@@ -5262,8 +5262,17 @@ const progress = {
   _default() { return {}; },
 };
 
-// Smart quiz question picker: prefers mistakes (for review), then unseen,
-// then falls back to mastered questions only if pool is exhausted.
+// Smart quiz question picker. Priority order:
+//   1) Unseen (fresh content)
+//   2) Mistakes (REVIEW priority, capped at half the slots so quizzes don't
+//      become 100% review)
+//   3) Mastered, recycled (only when 1+2 don't fill the slots)
+//
+// Recycle policy: with 500 levels × 25 rounds × ~4 questions per round, a
+// track will exhaust its ~150-question pool of unseen content quickly. When
+// that happens we'd rather show the user a question they already mastered
+// than leave the round empty. Mastered questions DO NOT get re-tagged with
+// the REVIEW badge — recycled is silently treated as a fresh quiz.
 function pickQuestionsForQuiz(lvl, subj, count) {
   let pool = getQuestionPool(lvl, subj);
   // Staged curriculum: filter by minLevel if questions have ml tags.
@@ -5274,32 +5283,43 @@ function pickQuestionsForQuiz(lvl, subj, count) {
   const seenSet = new Set(h.seen);
   const mistakesSet = new Set(h.mistakes);
 
-  const mistakes = [], unseen = [];
+  const mistakes = [], unseen = [], mastered = [];
   for (const q of pool) {
     if (mistakesSet.has(q._id)) mistakes.push(q);
     else if (!seenSet.has(q._id)) unseen.push(q);
-    // Mastered questions (seen + correct) are NEVER re-used — truly gone until
-    // the user gets them wrong again somewhere else.
+    else mastered.push(q); // seen + not in mistakes = mastered, recyclable
   }
   const shuffle = arr => { const a = [...arr]; for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 
   const picked = [];
-  // Up to half the quiz slots can be review (mistake) questions
+  // Up to half the quiz slots can be REVIEW (mistake) questions
   const maxMistakes = Math.ceil(count / 2);
   picked.push(...shuffle(mistakes).slice(0, Math.min(maxMistakes, mistakes.length)));
 
   // Fill remaining slots with fresh, unseen questions
-  const needMore = count - picked.length;
-  if (needMore > 0) picked.push(...shuffle(unseen).slice(0, needMore));
+  const needAfterReview = count - picked.length;
+  if (needAfterReview > 0) picked.push(...shuffle(unseen).slice(0, needAfterReview));
 
   // Still need more? Use extra mistakes (beyond the half-cap)
   const extraMistakesAvailable = mistakes.filter(m => !picked.includes(m));
   const stillNeed1 = count - picked.length;
   if (stillNeed1 > 0) picked.push(...shuffle(extraMistakesAvailable).slice(0, stillNeed1));
 
-  // If pool is fully exhausted (everything mastered, no mistakes) — return
-  // whatever we have, even if fewer than requested. The quiz phase handles
-  // empty arrays gracefully by auto-skipping.
+  // Still need more? Recycle mastered questions. This happens when the user
+  // has worked through the entire unseen pool and there are no outstanding
+  // mistakes — at that point we'd rather rotate through what they've already
+  // mastered than show an empty quiz. Mastered questions are tagged with
+  // _recycled so the UI can label them differently if needed (and so we
+  // don't re-record them in history — they're already mastered).
+  const stillNeed2 = count - picked.length;
+  if (stillNeed2 > 0 && mastered.length > 0) {
+    const recycled = shuffle(mastered).slice(0, stillNeed2).map(q => ({...q, _recycled: true}));
+    picked.push(...recycled);
+  }
+
+  // If pool is so small there's nothing at all, return whatever we have.
+  // (Realistically this only happens if a track has no questions at all,
+  // which would be a bug.)
   return shuffle(picked);
 }
 
