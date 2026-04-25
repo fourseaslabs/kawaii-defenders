@@ -331,6 +331,12 @@ body::before {
 .level-card .code { font-weight:700; font-size:22px; line-height:1.1; transition:font-size 0.2s; }
 .level-card.selected .code { font-size:24px; }
 .level-card .age { font-size:10px; color:#7A6A7C; margin-top:2px; font-weight:600; letter-spacing:0.5px; }
+/* Coming-soon: greyed-out, not interactive. Used for P5/P6 stubs. */
+.level-card.coming-soon { background:#F0E9E0; border-color:#B8B0A8; box-shadow:0 5px 0 #B8B0A8;
+  cursor:not-allowed; opacity:0.7; }
+.level-card.coming-soon .code { color:#9A9088; }
+.level-card.coming-soon .age { color:#9A9088; font-style:italic; }
+.level-card.coming-soon:active { transform:none; box-shadow:0 5px 0 #B8B0A8; }
 
 .subject-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; max-width:340px; margin-bottom:18px; }
 .subject-card { background:white; border:3px solid var(--ink); border-radius:18px; padding:14px 6px 10px;
@@ -1664,6 +1670,226 @@ function getProceduralMath(lvl) {
     }
   }
 
+  // ===== P4 — MOE 2026 syllabus (My Pals Are Here! Maths 4A/4B) =====
+  // Topics: whole numbers to 100,000 · multiplication 4-digit×1, 3-digit×2 ·
+  // division 4-digit÷1 · factors & multiples · fractions (mixed/improper,
+  // add/sub) · decimals (tenths/hundredths/thousandths) · decimal operations ·
+  // angles · symmetry · area & perimeter · nets (new in P4 from 2024) ·
+  // tables, line graphs, pie charts (pie charts new in P4 from 2024).
+  if (lvl === 'P4') {
+    const r = rng(401);
+    // Place value to 100,000
+    for (let i = 0; i < 18; i++) {
+      const num = 10000 + Math.floor(r() * 89999);
+      const digits = String(num);
+      const placeIdx = Math.floor(r() * digits.length);
+      const digit = parseInt(digits[placeIdx], 10);
+      const placeNames = ['ten thousands','thousands','hundreds','tens','ones'];
+      const placeName = placeNames[placeIdx + (5 - digits.length)];
+      const value = digit * Math.pow(10, digits.length - 1 - placeIdx);
+      const {opts, a} = wrongOpts(value, r, 0, 100000);
+      qs.push({q:`In ${num}, the digit ${digit} in the ${placeName} place stands for:`, opts, a, topic:"MPAH 4A · Place value", exp:`The ${digit} is in the ${placeName} place, so its value is ${value}.`});
+    }
+    // Reading numbers in words (sample)
+    for (let i = 0; i < 10; i++) {
+      const k = 1 + Math.floor(r() * 9);
+      const h = Math.floor(r() * 10);
+      const num = k * 10000 + h * 100;
+      const correct = num;
+      const {opts, a} = wrongOpts(correct, r, 10000, 100000);
+      const numText = `${k} ten thousand${h ? ', ' + h + ' hundred' : ''}`;
+      qs.push({q:`Write in numerals: ${numText}`, opts, a, topic:"MPAH 4A · Read & write", exp:`${numText} = ${num}.`});
+    }
+    // Rounding to 10, 100, 1000
+    for (let i = 0; i < 12; i++) {
+      const num = 100 + Math.floor(r() * 49900);
+      const place = pick([10, 100, 1000], r);
+      const ans = Math.round(num / place) * place;
+      const {opts, a} = wrongOpts(ans, r, 0, 60000);
+      qs.push({q:`Round ${num} to the nearest ${place}:`, opts, a, topic:"MPAH 4A · Rounding", exp:`Look at the digit just below the ${place}s place. ${num} rounds to ${ans}.`});
+    }
+    // Multiplication 4-digit × 1-digit
+    for (let i = 0; i < 18; i++) {
+      const a1 = 1000 + Math.floor(r() * 8999);
+      const b1 = 2 + Math.floor(r() * 8);
+      const ans = a1 * b1;
+      const {opts, a} = wrongOpts(ans, r, 1000, 90000);
+      qs.push({q:`${a1} × ${b1} = ?`, opts, a, topic:"MPAH 4A · Multiplication", exp:`${a1} × ${b1} = ${ans}. Multiply each place value, then add!`});
+    }
+    // Multiplication 3-digit × 2-digit
+    for (let i = 0; i < 12; i++) {
+      const a1 = 100 + Math.floor(r() * 899);
+      const b1 = 11 + Math.floor(r() * 88);
+      const ans = a1 * b1;
+      const {opts, a} = wrongOpts(ans, r, 1000, 90000);
+      qs.push({q:`${a1} × ${b1} = ?`, opts, a, topic:"MPAH 4A · Multiplication", exp:`${a1} × ${b1} = ${ans}.`});
+    }
+    // Division 4-digit ÷ 1-digit (no remainder)
+    for (let i = 0; i < 16; i++) {
+      const d = 2 + Math.floor(r() * 8);
+      const q1 = 100 + Math.floor(r() * 900);
+      const num = d * q1;
+      const ans = q1;
+      const {opts, a} = wrongOpts(ans, r, 0, 1500);
+      qs.push({q:`${num} ÷ ${d} = ?`, opts, a, topic:"MPAH 4A · Division", exp:`${num} ÷ ${d} = ${ans}. Check: ${d} × ${ans} = ${num}.`});
+    }
+    // Factors
+    const factorPairs = [[12,[1,2,3,4,6,12]],[18,[1,2,3,6,9,18]],[24,[1,2,3,4,6,8,12,24]],[20,[1,2,4,5,10,20]],[36,[1,2,3,4,6,9,12,18,36]],[15,[1,3,5,15]],[16,[1,2,4,8,16]],[48,[1,2,3,4,6,8,12,16,24,48]],[30,[1,2,3,5,6,10,15,30]],[40,[1,2,4,5,8,10,20,40]]];
+    for (const [num, factors] of factorPairs) {
+      // "Is X a factor of N?"
+      const isFactor = pick([true, false], r);
+      const candidate = isFactor ? pick(factors, r) : pick([7, 11, 13, 17].filter(x => num % x !== 0), r) || 7;
+      const correct = num % candidate === 0 ? 'Yes' : 'No';
+      const opts = ['Yes', 'No'];
+      qs.push({q:`Is ${candidate} a factor of ${num}?`, opts:[opts[0], opts[1], 'Maybe', 'Cannot tell'], a: opts.indexOf(correct), topic:"MPAH 4A · Factors", exp:`${candidate} is${correct === 'Yes' ? '' : ' not'} a factor of ${num}. Factors of ${num}: ${factors.join(', ')}.`});
+    }
+    // Common factors
+    for (let i = 0; i < 8; i++) {
+      const pairs = [[12,18,6],[16,24,8],[20,30,10],[15,25,5],[18,27,9],[14,21,7],[24,36,12],[10,15,5]];
+      const [x, y, gcf] = pairs[i % pairs.length];
+      const {opts, a} = wrongOpts(gcf, r, 1, 15);
+      qs.push({q:`Greatest common factor of ${x} and ${y}:`, opts, a, topic:"MPAH 4A · Common factors", exp:`The biggest number that divides both ${x} and ${y} is ${gcf}.`});
+    }
+    // Multiples
+    for (let i = 0; i < 8; i++) {
+      const m = 2 + Math.floor(r() * 10);
+      const k = 5 + Math.floor(r() * 8);
+      const ans = m * k;
+      const {opts, a} = wrongOpts(ans, r, m, m * 15);
+      qs.push({q:`What is the ${k}${k === 1 ? 'st' : k === 2 ? 'nd' : k === 3 ? 'rd' : 'th'} multiple of ${m}?`, opts, a, topic:"MPAH 4A · Multiples", exp:`The ${k}th multiple of ${m} = ${m} × ${k} = ${ans}.`});
+    }
+    // Common multiples
+    const cmPairs = [[2,3,6],[3,4,12],[4,5,20],[2,5,10],[3,5,15],[4,6,12],[2,7,14],[3,6,6]];
+    for (const [x, y, lcm] of cmPairs) {
+      const {opts, a} = wrongOpts(lcm, r, 1, 30);
+      qs.push({q:`Smallest common multiple of ${x} and ${y}:`, opts, a, topic:"MPAH 4A · Common multiples", exp:`The smallest number that is a multiple of both ${x} and ${y} is ${lcm}.`});
+    }
+    // Mixed numbers ↔ improper fractions
+    for (let i = 0; i < 12; i++) {
+      const denom = 2 + Math.floor(r() * 6);
+      const whole = 1 + Math.floor(r() * 5);
+      const num = 1 + Math.floor(r() * (denom - 1));
+      const improperNum = whole * denom + num;
+      const {opts, a} = wrongOpts(improperNum, r, 1, 50);
+      qs.push({q:`${whole} ${num}/${denom} = ?/${denom}`, opts, a, topic:"MPAH 4A · Mixed → Improper", exp:`${whole} × ${denom} + ${num} = ${improperNum}. So ${whole} ${num}/${denom} = ${improperNum}/${denom}.`});
+    }
+    // Add/subtract fractions (same denominator)
+    for (let i = 0; i < 14; i++) {
+      const denom = pick([3,4,5,6,8,10,12], r);
+      const a1 = 1 + Math.floor(r() * (denom - 1));
+      const b1 = 1 + Math.floor(r() * (denom - 1));
+      const op = pick(['+', '-'], r);
+      let ansNum;
+      if (op === '+') ansNum = a1 + b1;
+      else ansNum = Math.abs(a1 - b1);
+      const correct = `${ansNum}/${denom}`;
+      const distractors = [`${ansNum + 1}/${denom}`, `${ansNum}/${denom + 1}`, `${Math.max(1, ansNum - 1)}/${denom}`].filter(x => x !== correct).slice(0, 3);
+      const all = [correct, ...distractors];
+      const shuffled = shuffle4(all, r);
+      qs.push({q:`${a1}/${denom} ${op} ${b1}/${denom} = ?`, opts: shuffled, a: shuffled.indexOf(correct), topic:"MPAH 4A · Add/sub fractions", exp:`Same denominator: ${op === '+' ? 'add' : 'subtract'} the numerators. ${correct}.`});
+    }
+    // Compare fractions
+    for (let i = 0; i < 8; i++) {
+      const denom = pick([4,6,8,12], r);
+      const a1 = 1 + Math.floor(r() * (denom - 1));
+      const b1 = 1 + Math.floor(r() * (denom - 1));
+      if (a1 === b1) continue;
+      const correct = a1 > b1 ? `${a1}/${denom}` : `${b1}/${denom}`;
+      qs.push({q:`Which is bigger: ${a1}/${denom} or ${b1}/${denom}?`, opts:[`${a1}/${denom}`, `${b1}/${denom}`, 'Equal', 'Cannot tell'], a: a1 > b1 ? 0 : 1, topic:"MPAH 4A · Compare fractions", exp:`Same denominator: bigger numerator wins. ${correct}.`});
+    }
+    // Decimals — tenths
+    for (let i = 0; i < 10; i++) {
+      const tenths = 1 + Math.floor(r() * 9);
+      const ans = tenths / 10;
+      const {opts, a} = wrongOpts(ans, r, 0.1, 1.0);
+      qs.push({q:`${tenths} tenths as a decimal:`, opts: opts.map(o => o.toString()), a, topic:"MPAH 4B · Decimals", exp:`${tenths} tenths = ${tenths}/10 = ${ans}.`});
+    }
+    // Decimals — hundredths
+    for (let i = 0; i < 10; i++) {
+      const hundredths = 1 + Math.floor(r() * 99);
+      const ans = hundredths / 100;
+      const {opts, a} = wrongOpts(ans, r, 0.01, 1.0);
+      qs.push({q:`${hundredths} hundredths as a decimal:`, opts: opts.map(o => o.toString()), a, topic:"MPAH 4B · Decimals", exp:`${hundredths} hundredths = ${hundredths}/100 = ${ans}.`});
+    }
+    // Compare decimals
+    for (let i = 0; i < 8; i++) {
+      const a1 = (1 + Math.floor(r() * 99)) / 100;
+      const b1 = (1 + Math.floor(r() * 99)) / 100;
+      if (a1 === b1) continue;
+      const correct = a1 > b1 ? a1.toString() : b1.toString();
+      qs.push({q:`Which is bigger: ${a1} or ${b1}?`, opts:[a1.toString(), b1.toString(), 'Equal', 'Cannot tell'], a: a1 > b1 ? 0 : 1, topic:"MPAH 4B · Compare decimals", exp:`Compare digit by digit from left. ${correct} is bigger.`});
+    }
+    // Decimal addition / subtraction
+    for (let i = 0; i < 12; i++) {
+      const a1 = (10 + Math.floor(r() * 90)) / 10;
+      const b1 = (10 + Math.floor(r() * 90)) / 10;
+      const op = pick(['+', '-'], r);
+      const ans = op === '+' ? +(a1 + b1).toFixed(1) : +Math.abs(a1 - b1).toFixed(1);
+      const {opts, a} = wrongOpts(ans, r, 0, 30);
+      qs.push({q:`${a1} ${op} ${b1} = ?`, opts: opts.map(o => o.toString()), a, topic:"MPAH 4B · Decimal ops", exp:`Line up the decimal points, then ${op === '+' ? 'add' : 'subtract'}.`});
+    }
+    // Convert decimal ↔ fraction
+    const decFracPairs = [[0.5,'1/2'],[0.25,'1/4'],[0.75,'3/4'],[0.2,'1/5'],[0.1,'1/10'],[0.4,'2/5'],[0.6,'3/5'],[0.8,'4/5']];
+    for (const [dec, frac] of decFracPairs) {
+      const opts = [frac, '1/3', '2/3', '3/8'].filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 4);
+      while (opts.length < 4) opts.push('1/' + (opts.length + 6));
+      const shuffled = shuffle4(opts, r);
+      qs.push({q:`${dec} as a fraction:`, opts: shuffled, a: shuffled.indexOf(frac), topic:"MPAH 4B · Decimal↔Fraction", exp:`${dec} = ${frac}.`});
+    }
+    // Angles
+    const angleSets = [[30,'acute'],[45,'acute'],[60,'acute'],[90,'right'],[120,'obtuse'],[135,'obtuse'],[180,'straight']];
+    for (const [deg, type] of angleSets) {
+      qs.push({q:`A ${deg}° angle is:`, opts:['acute','right','obtuse','straight'], a: ['acute','right','obtuse','straight'].indexOf(type), topic:"MPAH 4B · Angles", exp:`Acute < 90°, right = 90°, obtuse 90°-180°, straight = 180°. ${deg}° is ${type}.`});
+    }
+    // Area of rectangle
+    for (let i = 0; i < 12; i++) {
+      const w = 2 + Math.floor(r() * 10);
+      const h = 2 + Math.floor(r() * 10);
+      const ans = w * h;
+      const {opts, a} = wrongOpts(ans, r, 1, 150);
+      qs.push({q:`Area of a rectangle ${w} cm × ${h} cm:`, opts: opts.map(o => o + ' cm²'), a, topic:"MPAH 4B · Area", exp:`Area = length × width = ${w} × ${h} = ${ans} cm².`});
+    }
+    // Perimeter of rectangle
+    for (let i = 0; i < 10; i++) {
+      const w = 2 + Math.floor(r() * 12);
+      const h = 2 + Math.floor(r() * 12);
+      const ans = 2 * (w + h);
+      const {opts, a} = wrongOpts(ans, r, 4, 100);
+      qs.push({q:`Perimeter of a rectangle ${w} cm × ${h} cm:`, opts: opts.map(o => o + ' cm'), a, topic:"MPAH 4B · Perimeter", exp:`Perimeter = 2 × (${w} + ${h}) = ${ans} cm.`});
+    }
+    // Find unknown side
+    for (let i = 0; i < 8; i++) {
+      const w = 3 + Math.floor(r() * 12);
+      const area = w * (2 + Math.floor(r() * 8));
+      const h = area / w;
+      const {opts, a} = wrongOpts(h, r, 1, 30);
+      qs.push({q:`A rectangle has area ${area} cm² and width ${w} cm. What is its length?`, opts: opts.map(o => o + ' cm'), a, topic:"MPAH 4B · Area", exp:`Length = area ÷ width = ${area} ÷ ${w} = ${h} cm.`});
+    }
+    // Symmetry — letters
+    const symLetters = [['A',true],['B',true],['C',true],['D',true],['E',true],['F',false],['G',false],['H',true],['M',true],['N',false],['O',true],['P',false],['T',true],['Z',false]];
+    for (const [L, hasSym] of symLetters) {
+      qs.push({q:`Does the letter "${L}" have a line of symmetry?`, opts:['Yes','No','Sometimes','Cannot tell'], a: hasSym ? 0 : 1, topic:"MPAH 4B · Symmetry", exp:`${L} ${hasSym ? 'can' : 'cannot'} be folded along a line so the two halves match.`});
+    }
+    // Nets (new in P4 from 2024)
+    qs.push({q:`A cube has how many faces?`, opts:['4','5','6','8'], a:2, topic:"MPAH 4B · Nets", exp:`A cube has 6 square faces — like a die.`});
+    qs.push({q:`A cube has how many edges?`, opts:['8','10','12','16'], a:2, topic:"MPAH 4B · Nets", exp:`A cube has 12 edges (where two faces meet).`});
+    qs.push({q:`A cube has how many vertices (corners)?`, opts:['4','6','8','12'], a:2, topic:"MPAH 4B · Nets", exp:`A cube has 8 vertices (corner points).`});
+    qs.push({q:`A triangular prism has how many faces?`, opts:['3','4','5','6'], a:2, topic:"MPAH 4B · Nets", exp:`A triangular prism has 2 triangle faces + 3 rectangle faces = 5 faces.`});
+    qs.push({q:`A square pyramid has how many faces?`, opts:['4','5','6','8'], a:1, topic:"MPAH 4B · Nets", exp:`1 square base + 4 triangle sides = 5 faces.`});
+    qs.push({q:`A square pyramid has how many vertices?`, opts:['4','5','6','8'], a:1, topic:"MPAH 4B · Nets", exp:`4 corners on the base + 1 apex = 5 vertices.`});
+    qs.push({q:`A cuboid has how many edges?`, opts:['8','10','12','14'], a:2, topic:"MPAH 4B · Nets", exp:`A cuboid (box shape) has 12 edges, same as a cube.`});
+    qs.push({q:`A net is a flat shape that folds up into a:`, opts:['2D shape','3D shape','line','curve'], a:1, topic:"MPAH 4B · Nets", exp:`A net is a flattened version of a 3D shape — unfold a box and you see its net.`});
+    // Pie charts (new in P4 from 2024)
+    qs.push({q:`In a pie chart of 100 students, the slice for "soccer" takes up 1/4 of the chart. How many students chose soccer?`, opts:['10','20','25','50'], a:2, topic:"MPAH 4B · Pie charts", exp:`1/4 of 100 = 25 students.`});
+    qs.push({q:`In a pie chart of 60 pets, dogs make up 1/3 of the chart. How many dogs?`, opts:['15','20','25','30'], a:1, topic:"MPAH 4B · Pie charts", exp:`1/3 of 60 = 20 dogs.`});
+    qs.push({q:`In a pie chart of 80 books, fiction takes up 1/2 the chart. How many fiction books?`, opts:['20','30','40','50'], a:2, topic:"MPAH 4B · Pie charts", exp:`1/2 of 80 = 40.`});
+    qs.push({q:`A pie chart shows favourite fruits. Apple = 50%, banana = 25%, others = 25%. If 40 children, how many chose banana?`, opts:['5','10','15','20'], a:1, topic:"MPAH 4B · Pie charts", exp:`25% of 40 = 10 children.`});
+    qs.push({q:`A pie chart's whole circle represents:`, opts:['half','one quarter','everything (100%)','only fractions'], a:2, topic:"MPAH 4B · Pie charts", exp:`The whole pie = 100% of the data.`});
+    // Line graphs
+    qs.push({q:`A line graph is BEST for showing:`, opts:['favourite colour','change over time','total of categories','exact number'], a:1, topic:"MPAH 4B · Line graphs", exp:`Line graphs show trends — how something changes over time.`});
+    qs.push({q:`On a line graph showing temperature: Mon=22°, Tue=25°, Wed=28°. The trend is:`, opts:['rising','falling','no change','random'], a:0, topic:"MPAH 4B · Line graphs", exp:`Temperature is going up each day — a rising trend.`});
+  }
+
   _procMathCache[lvl] = qs;
   return qs;
 }
@@ -1967,6 +2193,160 @@ function getProceduralEnglish(lvl) {
       const [sent, correct, expl] = pick(usages, r);
       const { opts, a } = buildOpts(correct, ["Its","It's","Its'","Itss"].filter(x => x !== correct), r);
       qs.push({q:sent, opts, a, topic:"STELLAR P3 · Its vs It's", exp:expl});
+    }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  // ===== P4 — STELLAR P4 (PSLE-prep onset) =====
+  // Topics: connectives, modals, more nuanced subject-verb agreement,
+  // prepositions, idioms & proverbs, similes, comparison/inference vocab,
+  // editing (spotting errors).
+  if (lvl === 'P4') {
+    const r = rng(5001);
+    // Connectives
+    const connectives = [
+      ["I was tired, ___ I went to bed early.","so","'so' shows result."],
+      ["She studied hard, ___ she passed the test.","therefore","'therefore' = as a result."],
+      ["___ the rain, we played outside.","Despite","'Despite' = even though something."],
+      ["He was hungry, ___ he kept working.","however","'however' shows contrast."],
+      ["I'll go ___ you come with me.","if","'if' introduces a condition."],
+      ["___ it was raining, we still played.","Although","'Although' = even though."],
+      ["She likes apples ___ oranges.","and","'and' joins similar items."],
+      ["I tried, ___ I couldn't lift it.","but","'but' shows contrast."],
+      ["___ the long journey, they arrived safely.","After","'After' = following something."],
+      ["You can have cake ___ ice cream.","or","'or' offers alternatives."],
+      ["He stayed up late ___ he had a test the next day.","because","'because' shows reason."],
+      ["___ leaving home, check the door is locked.","Before","'Before' = earlier than."],
+    ];
+    for (const [sent, correct, exp] of connectives) {
+      const distractors = shuffle4(connectives.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P4 · Connectives", exp});
+    }
+    // Modals
+    const modals = [
+      ["You ___ wear a helmet when cycling.","must","'must' = strong obligation."],
+      ["It ___ rain later — bring an umbrella.","might","'might' = possibility."],
+      ["___ I borrow your pencil, please?","May","'May I' = polite request for permission."],
+      ["She ___ swim before she could walk.","could","'could' = past ability."],
+      ["You ___ brush your teeth twice a day.","should","'should' = good advice."],
+      ["He ___ run very fast when he was younger.","could","'could' = past ability."],
+      ["I ___ help you with your homework if you'd like.","can","'can' = able to."],
+      ["You ___ touch that — it's hot!","mustn't","'mustn't' = it's forbidden."],
+    ];
+    for (const [sent, correct, exp] of modals) {
+      const distractors = shuffle4(["must","might","should","could","can","may","mustn't","would"].filter(x => x !== correct), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P4 · Modals", exp});
+    }
+    // Subject-verb agreement (advanced)
+    const sva = [
+      ["Either John or his brothers ___ to wash the car.","have","With 'either…or', the verb agrees with the noun closest to it. 'brothers have'."],
+      ["Each of the students ___ a notebook.","has","'Each' is singular: 'each…has'."],
+      ["The team ___ training hard for the match.","is","'team' (collective) acts as one — singular 'is'."],
+      ["Neither of the answers ___ correct.","is","'Neither of…' is singular."],
+      ["Everyone ___ going to the party.","is","'Everyone' is singular."],
+      ["The news ___ shocking.","is","'news' is singular even though it ends in -s."],
+      ["Mathematics ___ my favourite subject.","is","Subjects ending in -ics are singular."],
+      ["A pair of scissors ___ on the table.","is","'a pair' is singular."],
+    ];
+    for (const [sent, correct, exp] of sva) {
+      const { opts, a } = buildOpts(correct, ["are","were","have","has","is","was"].filter(x => x !== correct), r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P4 · Subject-verb agreement", exp});
+    }
+    // Prepositions of time and place
+    const preps = [
+      ["I'll see you ___ Monday.","on","Days of the week → 'on'."],
+      ["The meeting is ___ 3 PM.","at","Specific times → 'at'."],
+      ["My birthday is ___ April.","in","Months → 'in'."],
+      ["The cat is hiding ___ the bed.","under","Hiding below → 'under'."],
+      ["The painting hangs ___ the wall.","on","Surfaces → 'on'."],
+      ["She lives ___ Singapore.","in","Cities/countries → 'in'."],
+      ["Walk ___ the bridge to the other side.","across","Crossing → 'across'."],
+      ["The dog jumped ___ the fence.","over","Going above → 'over'."],
+      ["I have a class ___ Tuesday afternoons.","on","Days → 'on'."],
+      ["The keys are ___ the drawer.","in","Inside → 'in'."],
+    ];
+    for (const [sent, correct, exp] of preps) {
+      const { opts, a } = buildOpts(correct, ["on","in","at","under","over","across","through","by"].filter(x => x !== correct), r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P4 · Prepositions", exp});
+    }
+    // Idioms (PSLE-prep favourites)
+    const idioms = [
+      ["'A piece of cake' means:","Very easy","Common idiom — something done with no effort."],
+      ["'It's raining cats and dogs' means:","Raining heavily","An idiom — not literal!"],
+      ["'Once in a blue moon' means:","Very rarely","Blue moons are rare astronomical events."],
+      ["'Break the ice' means:","Start a conversation","Idiom for warming up a social situation."],
+      ["'Hit the books' means:","Study hard","Slang/idiom for studying intensely."],
+      ["'Spill the beans' means:","Reveal a secret","Idiom for accidentally revealing information."],
+      ["'Cost an arm and a leg' means:","Very expensive","Hyperbolic idiom for costly things."],
+      ["'Under the weather' means:","Feeling unwell","Idiom for being sick or low energy."],
+      ["'Bite the bullet' means:","Face something difficult bravely","Idiom for enduring something hard."],
+      ["'Pull yourself together' means:","Calm down and focus","Idiom for regaining self-control."],
+    ];
+    for (const [q, correct, exp] of idioms) {
+      const distractors = shuffle4(idioms.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q, opts, a, topic:"STELLAR P4 · Idioms", exp});
+    }
+    // Similes
+    const similes = [
+      ["'As busy as a ___'","bee","Bees buzz around constantly — symbol of busyness."],
+      ["'As cold as ___'","ice","Common simile."],
+      ["'As light as a ___'","feather","Feathers float — extremely light."],
+      ["'As blind as a ___'","bat","Bats famously have poor eyesight."],
+      ["'As brave as a ___'","lion","Lions are symbols of courage."],
+      ["'As quick as a ___'","flash","Flashes of light are instantaneous."],
+      ["'As stubborn as a ___'","mule","Mules are notoriously hard to budge."],
+      ["'As white as ___'","snow","Fresh snow is the picture of pure white."],
+    ];
+    for (const [q, correct, exp] of similes) {
+      const distractors = shuffle4(similes.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q, opts, a, topic:"STELLAR P4 · Similes", exp});
+    }
+    // Vocabulary in context
+    const vocab = [
+      ["The ___ traveller had visited many countries.","seasoned","'Seasoned' = experienced from long practice."],
+      ["She gave a ___ smile when she saw the gift.","delighted","'Delighted' = greatly pleased."],
+      ["The mountain peak was ___ in clouds.","shrouded","'Shrouded' = covered, hidden."],
+      ["The athlete's ___ effort earned her the gold medal.","tremendous","'Tremendous' = very great in amount."],
+      ["He looked ___ after staying up all night.","exhausted","'Exhausted' = extremely tired."],
+      ["The ___ child waited patiently in line.","obedient","'Obedient' = doing what is asked."],
+      ["The lake was ___ — perfect for sailing.","tranquil","'Tranquil' = calm and peaceful."],
+      ["Her room was ___ — books everywhere.","cluttered","'Cluttered' = messy with too many things."],
+    ];
+    for (const [sent, correct, exp] of vocab) {
+      const distractors = shuffle4(vocab.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P4 · Vocab in context", exp});
+    }
+    // Synonyms (P4 level)
+    const synonyms = [
+      ['enormous','huge'],['begin','start'],['rapid','fast'],['discover','find'],['ancient','old'],['terrified','scared'],['gigantic','massive'],['pleasant','nice'],['observe','watch'],['journey','trip'],['gather','collect'],['simple','easy'],['rescue','save'],['silent','quiet'],['weary','tired'],['vanish','disappear']
+    ];
+    const synPool = synonyms.flat();
+    for (const [w1, w2] of synonyms) {
+      const distractors = shuffle4(synPool.filter(x => x !== w1 && x !== w2), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`Synonym of ${w1.toUpperCase()}:`, opts, a, topic:"STELLAR P4 · Synonyms", exp:`${w1} ≈ ${w2}.`});
+    }
+    // Editing — find the error
+    const edits = [
+      ["She don't like spicy food.","doesn't","'She' takes 'doesn't', not 'don't'."],
+      ["I have went there before.","gone","After 'have', use past participle 'gone'."],
+      ["The childrens were laughing.","children","'children' is already plural — no -s."],
+      ["He runned all the way home.","ran","'run' is irregular: run-ran-run."],
+      ["She is more taller than me.","taller","Don't double up: either 'more tall' (rare) or 'taller'."],
+      ["I seen him yesterday.","saw","Past simple of 'see' is 'saw'. 'seen' needs 'have'."],
+      ["The book is laying on the table.","lying","Books 'lie' (no movement). 'lay' needs an object."],
+      ["Me and Sarah went home.","Sarah and I","Put yourself last. Use 'I' as a subject."],
+    ];
+    for (const [wrong, correct, exp] of edits) {
+      const distractors = shuffle4(["was","were","do","does","is","are","gone","ran","seen","children","I","me"].filter(x => x !== correct), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`Find the error: "${wrong}" — what should it be?`, opts, a, topic:"STELLAR P4 · Editing", exp});
     }
     _procEnglishCache[lvl] = qs;
     return qs;
@@ -2364,6 +2744,137 @@ function getProceduralChinese(lvl) {
     return qs;
   }
 
+  // ===== P4 — 欢乐伙伴 4A/4B =====
+  // Topics: extended characters, basic 成语 (4-char idioms), 同义词/反义词,
+  // sentence completion with 量词 (measure words), expanded 部首.
+  if (lvl === 'P4') {
+    const r = rng(7001);
+    // Common 成语 (introduction at P4)
+    const chengyu = [
+      ['一心一意','yī xīn yī yì','wholeheartedly, single-minded'],
+      ['马马虎虎','mǎ mǎ hǔ hǔ','careless, so-so'],
+      ['七上八下','qī shàng bā xià','anxious, unsettled'],
+      ['三心二意','sān xīn èr yì','indecisive'],
+      ['四面八方','sì miàn bā fāng','from all directions'],
+      ['五光十色','wǔ guāng shí sè','colourful, dazzling'],
+      ['九牛一毛','jiǔ niú yī máo','a tiny amount (lit: one hair from nine cows)'],
+      ['对牛弹琴','duì niú tán qín','wasted effort (lit: playing music to a cow)'],
+      ['画蛇添足','huà shé tiān zú','to overdo, ruin (lit: draw legs on a snake)'],
+      ['井底之蛙','jǐng dǐ zhī wā','narrow-minded (lit: frog at the bottom of a well)'],
+    ];
+    for (const [cy, py, en] of chengyu) {
+      const distractors = shuffle4(chengyu.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${cy} (${py}) means:`, opts, a, topic:"欢乐伙伴 4A · 成语", exp:`${cy} = ${en}.`});
+    }
+    // Reverse: meaning → chengyu
+    for (const [cy, py, en] of chengyu) {
+      const distractors = shuffle4(chengyu.filter(x => x[0] !== cy).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(cy, distractors, r);
+      qs.push({q:`成语 for "${en}":`, opts, a, topic:"欢乐伙伴 4A · 成语", exp:`${en} → ${cy} (${py}).`});
+    }
+    // 同义词 (synonyms)
+    const synonymsCN = [
+      ['美丽','漂亮','beautiful'],
+      ['高兴','开心','happy'],
+      ['困难','艰难','difficult'],
+      ['仔细','认真','careful'],
+      ['立刻','马上','immediately'],
+      ['永远','永久','forever'],
+      ['办法','方法','method'],
+      ['朋友','伙伴','friend/partner'],
+    ];
+    for (const [w1, w2, en] of synonymsCN) {
+      const distractors = shuffle4(synonymsCN.filter(x => x[1] !== w2).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`同义词 (synonym) of ${w1} (${en}):`, opts, a, topic:"欢乐伙伴 4A · 同义词", exp:`${w1} ≈ ${w2} (both mean "${en}").`});
+    }
+    // 反义词 (antonyms)
+    const antonymsCN = [
+      ['大','小','big/small'],
+      ['多','少','many/few'],
+      ['高','矮','tall/short'],
+      ['长','短','long/short'],
+      ['新','旧','new/old'],
+      ['快','慢','fast/slow'],
+      ['黑','白','black/white'],
+      ['冷','热','cold/hot'],
+      ['前','后','front/back'],
+      ['对','错','right/wrong'],
+      ['真','假','real/fake'],
+      ['开始','结束','begin/end'],
+    ];
+    for (const [w1, w2, en] of antonymsCN) {
+      const distractors = shuffle4(antonymsCN.filter(x => x[1] !== w2).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`反义词 (opposite) of ${w1} (${en.split('/')[0]}):`, opts, a, topic:"欢乐伙伴 4A · 反义词", exp:`${w1} ↔ ${w2}.`});
+    }
+    // 量词 (measure words) — important at P4
+    const measureWords = [
+      ['一___书','本','Books use 本 (běn).'],
+      ['一___狗','只','Most animals use 只 (zhī).'],
+      ['一___车','辆','Vehicles use 辆 (liàng).'],
+      ['一___人','个','People often use 个 (gè).'],
+      ['一___鱼','条','Long thin things like fish use 条 (tiáo).'],
+      ['一___纸','张','Flat things like paper use 张 (zhāng).'],
+      ['一___裤子','条','Clothing items like trousers use 条.'],
+      ['一___苹果','个','Round small fruits often use 个.'],
+      ['一___老师','位','Polite measure word for people: 位 (wèi).'],
+      ['一___花','朵','Flowers use 朵 (duǒ).'],
+    ];
+    for (const [phrase, correct, exp] of measureWords) {
+      const distractors = shuffle4(['本','只','辆','个','条','张','位','朵','片','支'].filter(x => x !== correct), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`Fill in: ${phrase}`, opts, a, topic:"欢乐伙伴 4A · 量词", exp});
+    }
+    // P4 vocabulary — daily life themes
+    const p4Vocab = [
+      ['图书馆','tú shū guǎn','library'],
+      ['博物馆','bó wù guǎn','museum'],
+      ['运动会','yùn dòng huì','sports day'],
+      ['文具盒','wén jù hé','pencil case'],
+      ['电视机','diàn shì jī','television'],
+      ['冰箱','bīng xiāng','refrigerator'],
+      ['洗衣机','xǐ yī jī','washing machine'],
+      ['新加坡','xīn jiā pō','Singapore'],
+      ['公共汽车','gōng gòng qì chē','public bus'],
+      ['地铁','dì tiě','MRT/subway'],
+      ['作业','zuò yè','homework'],
+      ['考试','kǎo shì','exam'],
+      ['成绩','chéng jì','grade/score'],
+      ['同学','tóng xué','classmate'],
+      ['老师','lǎo shī','teacher'],
+      ['校长','xiào zhǎng','principal'],
+    ];
+    for (const [ch, py, en] of p4Vocab) {
+      const distractors = shuffle4(p4Vocab.filter(x => x[0] !== ch).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(ch, distractors, r);
+      qs.push({q:`"${en}":`, opts, a, topic:"欢乐伙伴 4A · 词语", exp:`${en} = ${ch} (${py}).`});
+    }
+    // Reverse: char → English
+    for (const [ch, py, en] of p4Vocab) {
+      const distractors = shuffle4(p4Vocab.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} (${py}) means:`, opts, a, topic:"欢乐伙伴 4A · 词语", exp:`${ch} = ${en}.`});
+    }
+    // Tone marks practice
+    const toneWords = [
+      ['学习','xué xí','to study'],
+      ['朋友','péng you','friend'],
+      ['谢谢','xiè xie','thank you'],
+      ['再见','zài jiàn','goodbye'],
+      ['老师','lǎo shī','teacher'],
+      ['妈妈','mā ma','mum'],
+    ];
+    for (const [ch, py, en] of toneWords) {
+      const distractors = shuffle4(toneWords.filter(x => x[1] !== py).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(py, distractors, r);
+      qs.push({q:`Pinyin for ${ch} (${en}):`, opts, a, topic:"欢乐伙伴 4A · 拼音", exp:`${ch} = ${py}.`});
+    }
+    _procChineseCache[lvl] = qs;
+    return qs;
+  }
+
   _procChineseCache[lvl] = qs;
   return qs;
 }
@@ -2707,7 +3218,7 @@ function getQuestionPool(lvl, subj) {
     const seen = new Set();
     return arr.filter(q => { if (seen.has(q.q)) return false; seen.add(q.q); return true; });
   };
-  const isKidsGrade = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3');
+  const isKidsGrade = (lvl === 'K2' || lvl === 'P1' || lvl === 'P2' || lvl === 'P3' || lvl === 'P4' || lvl === 'P5' || lvl === 'P6');
   if (subj === 'mixed') {
     const stat = Q[lvl] || {};
     const procM = isKidsGrade ? getProceduralMath(lvl) : [];
@@ -5212,6 +5723,9 @@ const LEVEL_COLORS = {
   P1: { bg: '#FFB8A0', border: '#D14D6A', text: '#3D2E3F' },
   P2: { bg: '#C7B8EA', border: '#6B4FA0', text: '#3D2E3F' },
   P3: { bg: '#A8E6CF', border: '#2B9B63', text: '#3D2E3F' },
+  P4: { bg: '#A0D8F0', border: '#1976D2', text: '#3D2E3F' },
+  P5: { bg: '#FFCBA8', border: '#E07B3D', text: '#3D2E3F' },
+  P6: { bg: '#F0A8E0', border: '#A04D9E', text: '#3D2E3F' },
   beginner: { bg: '#A8E6CF', border: '#2B9B63', text: '#3D2E3F' },
   intermediate: { bg: '#A0D8F0', border: '#1976D2', text: '#3D2E3F' },
   advanced: { bg: '#C7B8EA', border: '#6B4FA0', text: '#3D2E3F' },
@@ -5262,13 +5776,16 @@ function buildStartScreen(mode) {
     screen.innerHTML = `
       <div class="mascots"><span>🐰</span><span>🐻</span><span>🚓</span><span>🚗</span><span>👸</span><span>🐼</span><span>🦄</span><span>🦉</span></div>
       <div class="title">Kids Mode</div>
-      <div class="subtitle">Singapore MOE syllabus · K2 to P3<br><span style="font-size:11px;opacity:0.85;">NEL · My Pals Are Here! · STELLAR · 欢乐伙伴</span></div>
+      <div class="subtitle">Singapore MOE syllabus · K2 to P6<br><span style="font-size:11px;opacity:0.85;">NEL · My Pals Are Here! · STELLAR · 欢乐伙伴</span></div>
       <div class="label">Your level</div>
       <div class="level-grid" id="levelGrid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
         <div class="level-card" data-level="K2"><div class="check-badge">✓</div><div class="code">K2</div><div class="age">Age 5-6</div></div>
         <div class="level-card selected" data-level="P1"><div class="check-badge">✓</div><div class="code">P1</div><div class="age">Age 7</div></div>
         <div class="level-card" data-level="P2"><div class="check-badge">✓</div><div class="code">P2</div><div class="age">Age 8</div></div>
         <div class="level-card" data-level="P3"><div class="check-badge">✓</div><div class="code">P3</div><div class="age">Age 9</div></div>
+        <div class="level-card" data-level="P4"><div class="check-badge">✓</div><div class="code">P4</div><div class="age">Age 10</div></div>
+        <div class="level-card coming-soon" data-level="P5"><div class="code">P5</div><div class="age">Coming soon</div></div>
+        <div class="level-card coming-soon" data-level="P6"><div class="code">P6</div><div class="age">Coming soon</div></div>
       </div>
       <div class="label">Subject</div>
       <div class="subject-grid" id="subjectGrid">
@@ -5850,6 +6367,10 @@ const ADMIN_TRACKS = [
   { mode: 'kids', level: 'P3', subject: 'english' },
   { mode: 'kids', level: 'P3', subject: 'chinese' },
   { mode: 'kids', level: 'P3', subject: 'mixed' },
+  { mode: 'kids', level: 'P4', subject: 'math' },
+  { mode: 'kids', level: 'P4', subject: 'english' },
+  { mode: 'kids', level: 'P4', subject: 'chinese' },
+  { mode: 'kids', level: 'P4', subject: 'mixed' },
   { mode: 'adults', level: 'beginner', subject: 'korean' },
 ];
 
