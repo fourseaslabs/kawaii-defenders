@@ -3020,6 +3020,324 @@ function getProceduralEnglish(lvl) {
   return qs;
 }
 
+// ============== HANYU PINYIN ANNOTATOR ==============
+// Goal: render Chinese-question text and answer options with pinyin so that
+// learners and parents can read along. Annotations look like "汉字 (hàn zì)".
+//
+// Two important constraints:
+//  1) Tone accuracy matters — wrong tones teach wrong pronunciation. The map
+//     below only includes characters whose standard 普通话 reading I'm
+//     confident about. Characters not in the map are simply skipped (no
+//     annotation produced rather than guessing).
+//  2) Pinyin-test questions (topic ends in "· 拼音") are SKIPPED entirely —
+//     showing the answer in the prompt would defeat the question.
+//
+// Multi-character runs are annotated as a unit ("学习 (xué xí)"), so common
+// 词语 read more naturally than character-by-character.
+const CN_PINYIN = {
+  // Numbers + basic
+  '一':'yī','二':'èr','三':'sān','四':'sì','五':'wǔ','六':'liù','七':'qī','八':'bā','九':'jiǔ','十':'shí',
+  '百':'bǎi','千':'qiān','万':'wàn','零':'líng',
+  // Pronouns + people
+  '我':'wǒ','你':'nǐ','他':'tā','她':'tā','我们':'wǒ men','你们':'nǐ men','他们':'tā men',
+  '人':'rén','大人':'dà rén','小孩':'xiǎo hái','男':'nán','女':'nǚ','老':'lǎo','少':'shǎo',
+  // Family
+  '爸':'bà','爸爸':'bà ba','妈':'mā','妈妈':'mā ma','哥':'gē','哥哥':'gē ge',
+  '姐':'jiě','姐姐':'jiě jie','弟':'dì','弟弟':'dì di','妹':'mèi','妹妹':'mèi mei',
+  '爷':'yé','爷爷':'yé ye','奶':'nǎi','奶奶':'nǎi nai','朋':'péng','友':'yǒu','朋友':'péng yǒu',
+  '伙':'huǒ','伴':'bàn','伙伴':'huǒ bàn',
+  // Body
+  '头':'tóu','手':'shǒu','脚':'jiǎo','口':'kǒu','耳':'ěr','目':'mù','眼':'yǎn','睛':'jīng','眼睛':'yǎn jīng',
+  '心':'xīn','身':'shēn','脑':'nǎo','嘴':'zuǐ','毛':'máo',
+  // Animals
+  '猫':'māo','狗':'gǒu','鸟':'niǎo','鱼':'yú','马':'mǎ','牛':'niú','羊':'yáng','猪':'zhū','鸡':'jī',
+  '兔':'tù','虎':'hǔ','龙':'lóng','蛇':'shé','蛙':'wā','蛇':'shé','熊':'xióng','象':'xiàng',
+  // Numbers + days
+  '日':'rì','月':'yuè','年':'nián','天':'tiān','今':'jīn','今天':'jīn tiān','昨':'zuó','昨天':'zuó tiān',
+  '明':'míng','明天':'míng tiān','早':'zǎo','晚':'wǎn','上':'shàng','下':'xià','左':'zuǒ','右':'yòu',
+  '前':'qián','后':'hòu','里':'lǐ','外':'wài','中':'zhōng',
+  // Time + adverbs
+  '时':'shí','现在':'xiàn zài','刻':'kè','分':'fēn','秒':'miǎo','点':'diǎn','钟':'zhōng',
+  '总':'zǒng','常':'cháng','常常':'cháng cháng','马上':'mǎ shàng','立':'lì','立刻':'lì kè','永':'yǒng','永远':'yǒng yuǎn',
+  // Verbs (high freq)
+  '是':'shì','有':'yǒu','在':'zài','去':'qù','来':'lái','到':'dào','吃':'chī','喝':'hē','看':'kàn',
+  '听':'tīng','说':'shuō','读':'dú','写':'xiě','做':'zuò','玩':'wán','学':'xué','学习':'xué xí',
+  '想':'xiǎng','要':'yào','会':'huì','能':'néng','可':'kě','可以':'kě yǐ','给':'gěi','把':'bǎ',
+  '走':'zǒu','跑':'pǎo','跳':'tiào','飞':'fēi','坐':'zuò','站':'zhàn','睡':'shuì','睡觉':'shuì jiào',
+  '买':'mǎi','卖':'mài','喜':'xǐ','欢':'huān','喜欢':'xǐ huān','爱':'ài','笑':'xiào','哭':'kū',
+  '问':'wèn','答':'dá','告':'gào','诉':'sù','告诉':'gào sù','叫':'jiào','请':'qǐng','谢':'xiè','谢谢':'xiè xie',
+  '帮':'bāng','助':'zhù','帮助':'bāng zhù','送':'sòng','找':'zhǎo','拿':'ná','放':'fàng',
+  '开':'kāi','关':'guān','打':'dǎ','拍':'pāi','推':'tuī','拉':'lā','握':'wò',
+  '完':'wán','成':'chéng','完成':'wán chéng','开始':'kāi shǐ','结束':'jié shù','结':'jié','束':'shù',
+  '起':'qǐ','起床':'qǐ chuáng','床':'chuáng','洗':'xǐ','澡':'zǎo','洗澡':'xǐ zǎo',
+  // Adjectives
+  '大':'dà','小':'xiǎo','多':'duō','高':'gāo','矮':'ǎi','长':'cháng','短':'duǎn','胖':'pàng','瘦':'shòu',
+  '宽':'kuān','窄':'zhǎi','深':'shēn','浅':'qiǎn','远':'yuǎn','近':'jìn','快':'kuài','慢':'màn',
+  '新':'xīn','旧':'jiù','美':'měi','美丽':'měi lì','漂':'piào','亮':'liàng','漂亮':'piào liang',
+  '红':'hóng','黄':'huáng','蓝':'lán','绿':'lǜ','白':'bái','黑':'hēi','紫':'zǐ','橙':'chéng','彩':'cǎi',
+  '好':'hǎo','坏':'huài','对':'duì','错':'cuò','真':'zhēn','假':'jiǎ','贵':'guì','便宜':'pián yi',
+  '冷':'lěng','热':'rè','暖':'nuǎn','凉':'liáng','干':'gān','湿':'shī',
+  '难':'nán','易':'yì','容易':'róng yì','简':'jiǎn','单':'dān','简单':'jiǎn dān','复':'fù','杂':'zá','复杂':'fù zá',
+  '艰':'jiān','艰难':'jiān nán','困':'kùn','困难':'kùn nán',
+  // School
+  '校':'xiào','学校':'xué xiào','书':'shū','本':'běn','笔':'bǐ','纸':'zhǐ','字':'zì','文':'wén',
+  '老师':'lǎo shī','师':'shī','同':'tóng','同学':'tóng xué','班':'bān','课':'kè','上课':'shàng kè',
+  '考':'kǎo','试':'shì','考试':'kǎo shì','作':'zuò','业':'yè','作业':'zuò yè',
+  '校长':'xiào zhǎng','成绩':'chéng jì','绩':'jì','图':'tú','图书':'tú shū','馆':'guǎn','图书馆':'tú shū guǎn',
+  '博':'bó','博物':'bó wù','博物馆':'bó wù guǎn','文具':'wén jù','文具盒':'wén jù hé','盒':'hé',
+  '运':'yùn','动':'dòng','运动':'yùn dòng','运动会':'yùn dòng huì','会':'huì',
+  // Places
+  '家':'jiā','房':'fáng','屋':'wū','门':'mén','窗':'chuāng','椅':'yǐ','桌':'zhuō',
+  '公':'gōng','园':'yuán','公园':'gōng yuán','医':'yī','医院':'yī yuàn','院':'yuàn',
+  '商':'shāng','店':'diàn','商店':'shāng diàn','超':'chāo','市':'shì','超市':'chāo shì',
+  '电':'diàn','视':'shì','电视':'diàn shì','电视机':'diàn shì jī','机':'jī','冰':'bīng','箱':'xiāng','冰箱':'bīng xiāng',
+  '洗衣机':'xǐ yī jī','衣':'yī','服':'fú','衣服':'yī fú','裤':'kù','裤子':'kù zi','鞋':'xié',
+  '车':'chē','汽车':'qì chē','汽':'qì','公共':'gōng gòng','共':'gòng','公共汽车':'gōng gòng qì chē',
+  '地':'dì','地铁':'dì tiě','铁':'tiě','船':'chuán','飞机':'fēi jī',
+  '新加坡':'xīn jiā pō','坡':'pō','加':'jiā','韩':'hán','韩国':'hán guó','国':'guó','中国':'zhōng guó',
+  // Nature
+  '山':'shān','水':'shuǐ','火':'huǒ','土':'tǔ','木':'mù','石':'shí','田':'tián',
+  '天空':'tiān kōng','空':'kōng','云':'yún','风':'fēng','雨':'yǔ','雪':'xuě','雷':'léi',
+  '太阳':'tài yáng','太':'tài','阳':'yáng','月亮':'yuè liàng','星':'xīng','星星':'xīng xing',
+  '春':'chūn','夏':'xià','秋':'qiū','冬':'dōng','季':'jì','季节':'jì jié','节':'jié',
+  '河':'hé','海':'hǎi','湖':'hú','江':'jiāng','池':'chí','井':'jǐng',
+  '花':'huā','草':'cǎo','树':'shù','叶':'yè','果':'guǒ','水果':'shuǐ guǒ','蔬':'shū','菜':'cài','蔬菜':'shū cài',
+  '苹':'píng','苹果':'píng guǒ','香':'xiāng','蕉':'jiāo','香蕉':'xiāng jiāo','西':'xī','瓜':'guā','西瓜':'xī guā',
+  // Food
+  '饭':'fàn','吃饭':'chī fàn','面':'miàn','米':'mǐ','肉':'ròu','蛋':'dàn','奶':'nǎi',
+  '茶':'chá','咖啡':'kā fēi','水':'shuǐ','汁':'zhī','果汁':'guǒ zhī',
+  '餐':'cān','早餐':'zǎo cān','午餐':'wǔ cān','晚餐':'wǎn cān','晚饭':'wǎn fàn',
+  '饼':'bǐng','饼干':'bǐng gān','糖':'táng',
+  // Counters / measure words
+  '个':'gè','只':'zhī','本':'běn','支':'zhī','张':'zhāng','条':'tiáo','辆':'liàng','位':'wèi','朵':'duǒ',
+  '片':'piàn','双':'shuāng','匹':'pǐ','头':'tóu','把':'bǎ','件':'jiàn','顶':'dǐng','扇':'shàn',
+  // Connectives + grammar
+  '和':'hé','或':'huò','但':'dàn','但是':'dàn shì','不':'bù','也':'yě','都':'dōu','很':'hěn',
+  '因':'yīn','为':'wèi','因为':'yīn wèi','所':'suǒ','所以':'suǒ yǐ','虽':'suī','虽然':'suī rán',
+  '然':'rán','如':'rú','如果':'rú guǒ','就':'jiù','只要':'zhǐ yào','只有':'zhǐ yǒu',
+  '不但':'bú dàn','而':'ér','而且':'ér qiě','且':'qiě','又':'yòu','既':'jì','既然':'jì rán',
+  '尽':'jǐn','尽管':'jǐn guǎn','无':'wú','无论':'wú lùn','论':'lùn',
+  // Concepts
+  '心':'xīn','意':'yì','一心':'yī xīn','一意':'yī yì',
+  '马虎':'mǎ hu','三心二意':'sān xīn èr yì',
+  '面':'miàn','方':'fāng','四面八方':'sì miàn bā fāng','光':'guāng','色':'sè','五光十色':'wǔ guāng shí sè',
+  '九牛一毛':'jiǔ niú yī máo','弹':'tán','琴':'qín','对牛弹琴':'duì niú tán qín',
+  '画':'huà','蛇添足':'shé tiān zú','添':'tiān','足':'zú','画蛇添足':'huà shé tiān zú',
+  '底':'dǐ','井底之蛙':'jǐng dǐ zhī wā','之':'zhī',
+  '七上八下':'qī shàng bā xià','一心一意':'yī xīn yī yì','马马虎虎':'mǎ mǎ hū hū',
+  // P5 advanced 成语
+  '百发百中':'bǎi fā bǎi zhòng','发':'fā','亡':'wáng','补':'bǔ','牢':'láo','亡羊补牢':'wáng yáng bǔ láo',
+  '守':'shǒu','株':'zhū','待':'dài','守株待兔':'shǒu zhū dài tù',
+  '塞':'sài','翁':'wēng','失':'shī','塞翁失马':'sài wēng shī mǎ',
+  '名':'míng','副':'fù','其':'qí','实':'shí','名副其实':'míng fù qí shí',
+  '协':'xié','力':'lì','同心协力':'tóng xīn xié lì','心':'xīn',
+  '熟':'shú','生':'shēng','巧':'qiǎo','熟能生巧':'shú néng shēng qiǎo',
+  '备':'bèi','患':'huàn','有备无患':'yǒu bèi wú huàn',
+  '废':'fèi','寝':'qǐn','忘':'wàng','食':'shí','废寝忘食':'fèi qǐn wàng shí',
+  '争':'zhēng','先':'xiān','恐':'kǒng','争先恐后':'zhēng xiān kǒng hòu',
+  '闻':'wén','鸡':'jī','舞':'wǔ','闻鸡起舞':'wén jī qǐ wǔ',
+  '举':'jǔ','两':'liǎng','得':'dé','一举两得':'yī jǔ liǎng dé',
+  // P6 PSLE 成语
+  '专':'zhuān','志':'zhì','专心致志':'zhuān xīn zhì zhì','致':'zhì',
+  '鸣':'míng','惊':'jīng','一鸣惊人':'yī míng jīng rén',
+  '全':'quán','赴':'fù','全力以赴':'quán lì yǐ fù','以':'yǐ',
+  '坐井观天':'zuò jǐng guān tiān','观':'guān',
+  '滴':'dī','成':'chéng','滴水成冰':'dī shuǐ chéng bīng',
+  '帆':'fān','顺':'shùn','一帆风顺':'yī fān fēng shùn',
+  '坚':'jiān','持':'chí','懈':'xiè','坚持不懈':'jiān chí bù xiè',
+  '异':'yì','日新月异':'rì xīn yuè yì',
+  '湖':'hú','五湖四海':'wǔ hú sì hǎi',
+  '思':'sī','议':'yì','不可思议':'bù kě sī yì',
+  '精':'jīng','益':'yì','求':'qiú','精益求精':'jīng yì qiú jīng',
+  '了':'liǎo','一目了然':'yī mù liǎo rán','然':'rán',
+  '络':'luò','绎':'yì','绝':'jué','络绎不绝':'luò yì bù jué',
+  '川':'chuān','流':'liú','息':'xī','川流不息':'chuān liú bù xī',
+  // 谚语 + abstracts
+  '熟读':'shú dú','唐':'táng','诗':'shī','三百':'sān bǎi','首':'shǒu','吟':'yín',
+  '活':'huó','到':'dào','学到老':'xué dào lǎo','活到老':'huó dào lǎo',
+  '寸':'cùn','光':'guāng','阴':'yīn','金':'jīn','一寸光阴一寸金':'yī cùn guāng yīn yī cùn jīn',
+  '失败':'shī bài','败':'bài','成功':'chéng gōng','母':'mǔ','失败是成功之母':'shī bài shì chéng gōng zhī mǔ',
+  '行':'xíng','必':'bì','三人行':'sān rén xíng','必有我师':'bì yǒu wǒ shī',
+  '志者':'zhì zhě','者':'zhě','事':'shì','竟':'jìng','有志者事竟成':'yǒu zhì zhě shì jìng chéng',
+  '玉':'yù','琢':'zhuó','器':'qì','玉不琢，不成器':'yù bù zhuó, bù chéng qì',
+  '路':'lù','遥':'yáo','知':'zhī','力':'lì','久':'jiǔ','见':'jiàn','路遥知马力':'lù yáo zhī mǎ lì',
+  '径':'jìng','勤':'qín','书山有路勤为径':'shū shān yǒu lù qín wéi jìng',
+  '计':'jì','一年之计在于春':'yī nián zhī jì zài yú chūn','于':'yú',
+  '功':'gōng','夫':'fū','功夫':'gōng fū','深':'shēn','杵':'chǔ','磨':'mó','针':'zhēn',
+  // P5 abstracts
+  '责':'zé','任':'rèn','责任':'zé rèn','梦':'mèng','梦想':'mèng xiǎng','友谊':'yǒu yì','谊':'yì',
+  '鼓':'gǔ','励':'lì','鼓励':'gǔ lì','激':'jī','激励':'jī lì','尊':'zūn','敬':'jìng','尊敬':'zūn jìng',
+  '关':'guān','关心':'guān xīn','决':'jué','决心':'jué xīn',
+  '环':'huán','境':'jìng','环境':'huán jìng','保':'bǎo','护':'hù','保护':'bǎo hù',
+  '勤劳':'qín láo','劳':'láo','懒':'lǎn','惰':'duò','懒惰':'lǎn duò',
+  '勇':'yǒng','勇敢':'yǒng gǎn','敢':'gǎn','胆':'dǎn','胆小':'dǎn xiǎo',
+  '诚':'chéng','诚实':'chéng shí','虚':'xū','伪':'wěi','虚伪':'xū wěi',
+  '仔':'zǐ','仔细':'zǐ xì','细':'xì','认':'rèn','认真':'rèn zhēn',
+  '危':'wēi','险':'xiǎn','危险':'wēi xiǎn','安':'ān','安全':'ān quán',
+  '高兴':'gāo xìng','兴':'xìng','开心':'kāi xīn','悲':'bēi','伤':'shāng','悲伤':'bēi shāng',
+  '丑':'chǒu','陋':'lòu','丑陋':'chǒu lòu','富':'fù','裕':'yù','富裕':'fù yù','贫':'pín','穷':'qióng','贫穷':'pín qióng',
+  '谦':'qiān','谦虚':'qiān xū','骄':'jiāo','傲':'ào','骄傲':'jiāo ào',
+  '团':'tuán','团结':'tuán jié','分裂':'fēn liè','裂':'liè',
+  '谨':'jǐn','慎':'shèn','谨慎':'jǐn shèn','大意':'dà yì','意':'yì',
+  '宽广':'kuān guǎng','广':'guǎng','狭':'xiá','狭窄':'xiá zhǎi',
+  '丰':'fēng','丰富':'fēng fù','贫乏':'pín fá','乏':'fá',
+  '详':'xiáng','详细':'xiáng xì','简略':'jiǎn lüè','略':'lüè',
+  '先进':'xiān jìn','进':'jìn','落':'luò','落后':'luò hòu',
+  '真':'zhēn','真诚':'zhēn chéng','虚假':'xū jiǎ','假':'jiǎ',
+  // P6 abstract
+  '欣':'xīn','欣慰':'xīn wèi','慰':'wèi','感':'gǎn','动':'dòng','感动':'gǎn dòng',
+  '佩':'pèi','佩服':'pèi fú','积':'jī','积极':'jī jí','极':'jí',
+  '失望':'shī wàng','望':'wàng','感激':'gǎn jī','态':'tài','度':'dù','态度':'tài dù',
+  '国':'guó','庆':'qìng','国庆':'guó qìng','国庆日':'guó qìng rì',
+  '传':'chuán','统':'tǒng','传统':'chuán tǒng','化':'huà','文化':'wén huà','传统文化':'chuán tǒng wén huà',
+  '能':'néng','源':'yuán','能源':'néng yuán','节约':'jié yuē','约':'yuē','节约能源':'jié yuē néng yuán',
+  '循':'xún','环再':'huán zài','利':'lì','用':'yòng','利用':'lì yòng','循环':'xún huán','循环再利用':'xún huán zài lì yòng',
+  '健':'jiàn','康':'kāng','健康':'jiàn kāng','身心':'shēn xīn','身心健康':'shēn xīn jiàn kāng',
+  '网':'wǎng','络':'luò','网络':'wǎng luò','网络安全':'wǎng luò ān quán',
+  '环境保护':'huán jìng bǎo hù',
+  // common particles + others appearing in question text
+  // 得 and 地 default to the particle reading (de) — most common in primary
+  // textbook contexts (慢慢地走, 跑得快). Vocabulary uses like 地铁, 一举两得
+  // are mapped as multi-character compounds above so they keep the correct
+  // dì / dé readings.
+  '了':'le','着':'zhe','的':'de','地':'de','得':'de','吗':'ma','呢':'ne','吧':'ba','啊':'a',
+  '哪':'nǎ','哪里':'nǎ lǐ','什么':'shén me','什':'shén','么':'me','谁':'shéi','为什么':'wèi shén me',
+  '怎':'zěn','怎么':'zěn me','怎样':'zěn yàng','样':'yàng','这':'zhè','那':'nà','这个':'zhè ge','那个':'nà ge',
+  '种':'zhǒng','些':'xiē','一些':'yī xiē','所有':'suǒ yǒu','很多':'hěn duō',
+  // sentence and grammar
+  '句':'jù','句子':'jù zi','词':'cí','词语':'cí yǔ','语':'yǔ','字':'zì','汉字':'hàn zì','汉':'hàn',
+  '同义':'tóng yì','同义词':'tóng yì cí','反义':'fǎn yì','反义词':'fǎn yì cí','反':'fǎn',
+  '量':'liàng','量词':'liàng cí','病':'bìng','病句':'bìng jù','改':'gǎi','正':'zhèng','改正':'gǎi zhèng',
+  '修':'xiū','修改':'xiū gǎi','缺':'quē','颠':'diān','倒':'dǎo','颠倒':'diān dǎo','重':'chóng','重复':'chóng fù',
+  '搭':'dā','配':'pèi','搭配':'dā pèi','逻':'luó','辑':'jí','逻辑':'luó jí',
+  '主':'zhǔ','主语':'zhǔ yǔ','缺主语':'quē zhǔ yǔ','矛':'máo','盾':'dùn','矛盾':'máo dùn',
+  '正确':'zhèng què','确':'què','错误':'cuò wù','误':'wù',
+  // application context
+  '同心':'tóng xīn','耐心':'nài xīn','耐':'nài','面对':'miàn duì','面':'miàn','对':'duì',
+  '保持':'bǎo chí','持':'chí','积极':'jī jí','努':'nǔ','努力':'nǔ lì',
+  '取':'qǔ','取得':'qǔ dé','成绩':'chéng jì','优':'yōu','优异':'yōu yì','优秀':'yōu xiù',
+  '终':'zhōng','于':'yú','终于':'zhōng yú','赢':'yíng','胜':'shèng','胜利':'shèng lì','利':'lì',
+  '比赛':'bǐ sài','赛':'sài','比':'bǐ','获':'huò','获得':'huò dé','信':'xìn','信心':'xìn xīn',
+  '通过':'tōng guò','通':'tōng','过':'guò','改正':'gǎi zhèng',
+  '提':'tí','提高':'tí gāo','节约用水':'jié yuē yòng shuǐ','节':'jié','约':'yuē','用水':'yòng shuǐ',
+  '惯':'guàn','习惯':'xí guàn','习':'xí',
+  '逻辑乱':'luó jí luàn','乱':'luàn','疑':'yí','怀疑':'huái yí','怀':'huái',
+  // misc fillers in topic exp
+  '注':'zhù','注意':'zhù yì','希':'xī','希望':'xī wàng','请求':'qǐng qiú','警':'jǐng','警告':'jǐng gào',
+  '建':'jiàn','议':'yì','建议':'jiàn yì','讨':'tǎo','讨论':'tǎo lùn','认识':'rèn shí','识':'shí',
+  '让':'ràng','让':'ràng','使':'shǐ','叫':'jiào','请':'qǐng',
+  '设':'shè','设计':'shè jì','计算':'jì suàn','算':'suàn',
+  // additional common
+  '种':'zhǒng','花':'huā','植':'zhí','植物':'zhí wù','物':'wù','动物':'dòng wù',
+  '颜':'yán','颜色':'yán sè','颜色':'yán sè','颜':'yán',
+  '声':'shēng','声音':'shēng yīn','音':'yīn',
+  // common-question-text characters discovered in testing
+  '几':'jǐ','岁':'suì','大约':'dà yuē','约':'yuē','左':'zuǒ','右':'yòu','左右':'zuǒ yòu',
+  '怕':'pà','可怕':'kě pà','怀':'huái','疑问':'yí wèn',
+  '题':'tí','问题':'wèn tí','偏':'piān','旁':'páng','偏旁':'piān páng',
+  '同义词是':'tóng yì cí shì','的同义词':'de tóng yì cí',
+  '反义词是':'fǎn yì cí shì','的反义词':'de fǎn yì cí',
+  '什么意思':'shén me yì sī','的意思':'de yì sī','意思':'yì sī','思':'sī',
+  '可爱':'kě ài','爱':'ài','可':'kě','怕':'pà',
+  // mid-sentence connectors / fillers
+  '还':'hái','还是':'hái shì','是':'shì','跟':'gēn','向':'xiàng','从':'cóng',
+  '别':'bié','别的':'bié de','其它':'qí tā','其他':'qí tā','它':'tā',
+  // Numbers / quantifiers extra
+  '几':'jǐ','几个':'jǐ ge','几只':'jǐ zhǐ','岁':'suì',
+  // P3-era radical question vocabulary
+  '部':'bù','部首':'bù shǒu','旁':'páng','偏旁':'piān páng',
+  // additional commonly-seen
+  '认':'rèn','认为':'rèn wéi','觉':'jué','觉得':'jué de','感觉':'gǎn jué',
+  '感到':'gǎn dào','害':'hài','害怕':'hài pà','开心':'kāi xīn','难':'nán','难过':'nán guò','过':'guò',
+  // continuation particles
+  '将':'jiāng','已':'yǐ','已经':'yǐ jīng','经':'jīng','曾':'céng',
+  '才':'cái','正':'zhèng','刚':'gāng','刚才':'gāng cái',
+};
+// Sort key: longest entries first, so multi-char 词语 like "学习" annotate as
+// a unit before single-character "学"+"习" rules trigger.
+const CN_PINYIN_KEYS = Object.keys(CN_PINYIN).sort((a, b) => b.length - a.length);
+
+// Detect whether a string contains any CJK character at all.
+function hasCJK(text) {
+  if (typeof text !== 'string') return false;
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0x4E00 && code <= 0x9FFF) return true;
+  }
+  return false;
+}
+
+// Annotate a single string: find runs of Chinese characters, look them up
+// (longest-first), append "(pinyin)" after each annotated run. Runs that
+// don't fully resolve to known characters are left untouched (we'd rather
+// show no pinyin than wrong pinyin).
+function annotatePinyin(text) {
+  if (typeof text !== 'string' || !hasCJK(text)) return text;
+  // Already-annotated text would have "(pinyin)" or pinyin tone marks
+  // adjacent to characters; skip if we detect that pattern to avoid
+  // double-annotating during dev or if a question already includes pinyin.
+  // Heuristic: if a Chinese character is immediately followed by " (" then
+  // a Latin letter, assume pinyin is already there.
+  const looksAnnotated = /[\u4E00-\u9FFF]\s*\([a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀ-ǜ ]+\)/.test(text);
+  if (looksAnnotated) return text;
+
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const code = text.charCodeAt(i);
+    const isCJK = (code >= 0x4E00 && code <= 0x9FFF);
+    if (!isCJK) { out += text[i]; i++; continue; }
+    // Find the end of this CJK run.
+    let j = i;
+    while (j < text.length) {
+      const c = text.charCodeAt(j);
+      if (c >= 0x4E00 && c <= 0x9FFF) j++;
+      else break;
+    }
+    const run = text.slice(i, j);
+    // Greedy longest-match within the run.
+    const tokens = [];
+    let k = 0;
+    let allKnown = true;
+    while (k < run.length) {
+      let matched = null;
+      for (const key of CN_PINYIN_KEYS) {
+        if (key.length > run.length - k) continue;
+        if (run.slice(k, k + key.length) === key) { matched = key; break; }
+      }
+      if (matched) {
+        tokens.push(CN_PINYIN[matched]);
+        k += matched.length;
+      } else {
+        // Unknown character — bail on annotation for this whole run.
+        allKnown = false;
+        break;
+      }
+    }
+    if (allKnown && tokens.length > 0) {
+      out += run + ' (' + tokens.join(' ') + ')';
+    } else {
+      out += run; // leave alone rather than mislead
+    }
+    i = j;
+  }
+  return out;
+}
+
+// Apply pinyin annotation to a Chinese question. Skips pinyin-test
+// questions (their topic ends in "· 拼音") because annotating would give
+// the answer away.
+function annotateQuestion(qObj) {
+  if (!qObj || typeof qObj !== 'object') return qObj;
+  if (typeof qObj.topic === 'string' && qObj.topic.endsWith('· 拼音')) return qObj;
+  // Don't mutate the source — clone shallowly.
+  const out = { ...qObj };
+  if (typeof out.q === 'string') out.q = annotatePinyin(out.q);
+  if (Array.isArray(out.opts)) out.opts = out.opts.map(o => typeof o === 'string' ? annotatePinyin(o) : o);
+  if (typeof out.exp === 'string') out.exp = annotatePinyin(out.exp);
+  return out;
+}
+
 // ============== PROCEDURAL CHINESE GENERATOR ==============
 // Generates pinyin ↔ character drills aligned to 欢乐伙伴 syllabus.
 const _procChineseCache = {};
@@ -4149,7 +4467,14 @@ const EXTRA_CHINESE = {
 };
 
 function getQuestionPool(lvl, subj) {
-  const tag = (arr, src) => arr.map((q, i) => ({...q, _id: `${src}_${i}`, _src: src}));
+  // Pinyin-annotate Chinese-source questions on the way out. We do this here
+  // (not in the generators) so it runs once per pool build and applies
+  // uniformly across static, EXTRA_*, and procedural sources.
+  const tag = (arr, src) => arr.map((q, i) => {
+    const tagged = {...q, _id: `${src}_${i}`, _src: src};
+    if (src === 'chinese' || src === 'ec' || src === 'pc') return annotateQuestion(tagged);
+    return tagged;
+  });
   // Dedup by question text. Two different entries (possibly from different
   // sources, or from procedural generators producing the same prompt twice)
   // that share the same `q` text would break the no-repeat contract — the
