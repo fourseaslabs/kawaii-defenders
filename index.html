@@ -3574,7 +3574,9 @@ function updateEnemies(dt) {
 // ============== TOWERS ==============
 function placeTower(col, row, type) {
   const c = cellCenter(col, row);
-  state.towers.push({ type, level: 0, col, row, x: c.x, y: c.y, cooldown: 0 });
+  // Default targetMode 'first' (closest to goal) — what TD players expect.
+  // 'last' lets towers focus on enemies that just spawned.
+  state.towers.push({ type, level: 0, col, row, x: c.x, y: c.y, cooldown: 0, targetMode: 'first' });
 }
 
 function updateTowers(dt) {
@@ -3583,11 +3585,22 @@ function updateTowers(dt) {
     t.cooldown -= dt * 1000;
     if (t.cooldown > 0) continue;
     const rangePx = spec.range * state.tileSize;
-    let target = null, best = Infinity;
+    // Pick a target based on the tower's targetMode.
+    //   'first' (default) — enemy with the most path progress (closest to goal)
+    //   'last'            — enemy with the least path progress (closest to spawn)
+    // Path progress = segment + t for each enemy.
+    const mode = t.targetMode || 'first';
+    let target = null;
+    let bestProgress = mode === 'first' ? -Infinity : Infinity;
     for (const e of state.enemies) {
       if (e.segment < 1) continue; // Still off-screen — invulnerable until visible
       const d = Math.hypot(e.x - t.x, e.y - t.y);
-      if (d < rangePx && d < best) { best = d; target = e; }
+      if (d >= rangePx) continue;
+      const progress = (e.segment || 0) + (e.t || 0);
+      if (mode === 'first' ? progress > bestProgress : progress < bestProgress) {
+        bestProgress = progress;
+        target = e;
+      }
     }
     if (target) {
       const proj = { x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color };
@@ -4023,6 +4036,7 @@ function openTowerPopup(tower) {
     return `<div class="tower-stat">${label} <b>${cur}${unit}</b> → <b style="color:#2B9B63;">${nxt}${unit}</b></div>`;
   };
 
+  const mode = tower.targetMode || 'first';
   popup.innerHTML = `
     <div class="tower-card">
       <div class="tower-emoji">${isMax ? '👑' : ''}${current.emoji}</div>
@@ -4035,6 +4049,19 @@ function openTowerPopup(tower) {
         ${current.splash ? statRow('💥 SPLASH', current.splash, next?.splash, ' tile') : ''}
         ${current.slow != null ? statRow('🐌 SLOW', Math.round(current.slow * 100), next ? Math.round(next.slow * 100) : null, '%') : ''}
         ${current.dotPct ? statRow('☠️ POISON', `${Math.round(current.dotPct * 100)}% × ${current.dotTicks}`, next ? `${Math.round(next.dotPct * 100)}% × ${next.dotTicks}` : null) : ''}
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:#4A3D4C;margin-bottom:4px;">🎯 TARGET</div>
+        <div style="display:flex;gap:6px;">
+          <button class="target-mode-btn ${mode === 'first' ? 'active' : ''}" data-mode="first"
+            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;background:${mode === 'first' ? 'var(--peach)' : 'white'};color:var(--ink);">
+            ⏩ First
+          </button>
+          <button class="target-mode-btn ${mode === 'last' ? 'active' : ''}" data-mode="last"
+            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;background:${mode === 'last' ? 'var(--peach)' : 'white'};color:var(--ink);">
+            ⏪ Last
+          </button>
+        </div>
       </div>
       <div class="tower-btns">
         ${next ? `
@@ -4052,6 +4079,19 @@ function openTowerPopup(tower) {
       </div>
     </div>
   `;
+  // Wire target-mode buttons. Apply immediately, persist, and rerender popup
+  // so the active state is visually correct.
+  popup.querySelectorAll('.target-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newMode = btn.dataset.mode;
+      if (tower.targetMode === newMode) return;
+      tower.targetMode = newMode;
+      audio.play('click');
+      persistSession();
+      // Re-open popup to reflect the new active button.
+      showTowerPopup(tower);
+    });
+  });
   if (next) {
     document.getElementById('upgradeBtn').addEventListener('click', () => {
       if (state.coins < next.cost) { audio.play('invalid'); return; }
@@ -4588,6 +4628,7 @@ function buildSessionSnapshot() {
   // resizes between sessions.
   const towers = (state.towers || []).map(t => ({
     type: t.type, level: t.level, col: t.col, row: t.row,
+    targetMode: t.targetMode || 'first',
   }));
   return {
     mode: state.mode,
@@ -4673,6 +4714,7 @@ function rehydrateSession(session) {
         col: t.col, row: t.row,
         x: c.x, y: c.y,
         cooldown: 0,
+        targetMode: (t.targetMode === 'last') ? 'last' : 'first',
       });
     }
     return true;
