@@ -4970,7 +4970,21 @@ const progress = {
     try {
       if (!window.fbDb || !this._uid) return;
       const ref = window.fbDoc(window.fbDb, 'progress', this._uid);
-      await window.fbSetDoc(ref, { data: this.data, updatedAt: Date.now() }, { merge: true });
+      // Pull current cloud state and merge with local before writing back.
+      // This protects against blowing away concurrent edits — most importantly
+      // edits made by an admin while the user is signed in. The merge logic
+      // (in _merge) takes the newer livesPoolUpdatedAt for the lives pool,
+      // unions claimed rewards, and takes the max for unlocked/stars, so the
+      // user's recent in-game changes still win where they should.
+      let cloud = {};
+      try {
+        const snap = await window.fbGetDoc(ref);
+        if (snap.exists()) cloud = snap.data().data || {};
+      } catch (e) { /* if pull fails, fall back to overwrite to avoid blocking the save */ }
+      const merged = this._merge(this.data, cloud);
+      this.data = merged;
+      try { localStorage.setItem('kd_progress_v1', JSON.stringify(this.data)); } catch (e) {}
+      await window.fbSetDoc(ref, { data: merged, updatedAt: Date.now() }, { merge: true });
     } catch(e) { console.warn('Cloud push failed:', e); }
   },
   _merge(local, cloud) {
@@ -6984,6 +6998,13 @@ async function showJourneyScreen() {
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('journeyScreen').classList.remove('hidden');
   await progress.load();
+  // Re-pull cloud state on every map entry. progress.load() is a no-op after
+  // the first call, but admins editing a user's lives/unlocked/towers should
+  // become visible without the user having to sign out and back in. The pull
+  // is cheap (single Firestore doc read) and runs while the screen renders.
+  if (progress._uid) {
+    try { await progress._pullCloud(); } catch (e) { /* fall through to local data */ }
+  }
   const unlocked = progress.getUnlocked(state.level, state.subject);
   const isKorean = state.mode === 'adults' && state.subject === 'korean';
   const lvlLabel = state.mode === 'adults'
@@ -7969,8 +7990,19 @@ async function doAdminSave() {
       }
     });
     const ref = window.fbDoc(window.fbDb, 'progress', _adminTargetUid);
-    await window.fbSetDoc(ref, { data, updatedAt: Date.now() }, { merge: true });
-    _adminTargetData = data;
+    // Re-pull and merge before writing, so we don't clobber any in-game
+    // changes the user made between the admin loading the lookup and clicking
+    // Save. Merge logic respects livesPoolUpdatedAt for the lives field, so
+    // an admin's intentional lives edit (just bumped to Date.now()) still
+    // wins over the user's older in-game decrements.
+    let serverData = {};
+    try {
+      const snap = await window.fbGetDoc(ref);
+      if (snap.exists()) serverData = snap.data().data || {};
+    } catch (e) { /* fall through to plain overwrite if pull fails */ }
+    const finalData = progress._merge(data, serverData);
+    await window.fbSetDoc(ref, { data: finalData, updatedAt: Date.now() }, { merge: true });
+    _adminTargetData = finalData;
     msg.textContent = '✓ Saved. Target user will see changes on next sign-in or cloud pull.';
     msg.classList.remove('err');
   } catch (e) {
