@@ -6452,10 +6452,19 @@ function renderQuizQuestion() {
           // Got it right on the retry — graduate it out of the cross-quiz
           // mistakes pile so it stops showing up. recordAnswer with correct=true
           // does exactly this (removes from mistakes, leaves seen alone if
-          // already there).
+          // already there). Once a question is in `seen` and not in `mistakes`,
+          // pickQuestionsForQuiz will NEVER select it again on this track.
           progress.recordAnswer(state.level, q._id, true);
+          console.log(`[KD] Question ${q._id} retired on this track (${state.level}) — won't appear again.`);
+          // Visible feedback so the user knows the question is now mastered.
+          const masteredBadge = document.createElement('div');
+          masteredBadge.className = 'correct-reveal';
+          masteredBadge.style.background = '#D4F5C4';
+          masteredBadge.innerHTML = `🌟 <b>Mastered!</b> <span class="exp-text">You won't see this question again.</span>`;
+          const card = overlay.querySelector('.question-card');
+          if (card) card.appendChild(masteredBadge);
         }
-        setTimeout(() => { advanceQuiz(); }, 650);
+        setTimeout(() => { advanceQuiz(); }, inRetry ? 1200 : 650);
       } else {
         btn.classList.add('wrong');
         audio.play('wrong');
