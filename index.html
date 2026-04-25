@@ -2116,6 +2116,172 @@ function getProceduralMath(lvl) {
     qs.push({q:`A square is a special:`, opts:['triangle','rhombus','trapezium','circle'], a:1, topic:"MPAH 5B · Quadrilaterals", exp:`A square is a rhombus with right angles (also a special rectangle).`});
   }
 
+  // ===== P6 — MOE 2026 PSLE syllabus (My Pals Are Here! Maths 6A/6B) =====
+  // 2026 PSLE incorporates the new syllabus. Post-shuffle: speed REMOVED
+  // (now Sec 1), average MOVED HERE from P5, ratio (3-term) MOVED HERE.
+  // Topics: fraction division, ratio (full topic), percentage problems
+  // (find whole, % change), simple algebra (intro), circles (πd, πr²,
+  // semicircles, quarter-circles), volume (find missing dimension), average,
+  // angles in composite figures.
+  if (lvl === 'P6') {
+    const r = rng(601);
+    // Fraction division — proper fraction ÷ whole number
+    for (let i = 0; i < 10; i++) {
+      const denom = pick([2,3,4,5,6,8], r);
+      const numer = 1 + Math.floor(r() * (denom - 1));
+      const whole = 2 + Math.floor(r() * 5);
+      const ansDenom = denom * whole;
+      const correct = `${numer}/${ansDenom}`;
+      const distractors = [
+        `${numer * whole}/${denom}`,
+        `${numer}/${denom + whole}`,
+        `${numer + whole}/${denom}`,
+      ].filter(x => x !== correct).slice(0, 3);
+      const all = [correct, ...distractors];
+      const shuffled = shuffle4(all, r);
+      qs.push({q:`${numer}/${denom} ÷ ${whole} = ?`, opts: shuffled, a: shuffled.indexOf(correct), topic:"MPAH 6A · Fraction ÷ whole", exp:`Dividing by ${whole} = multiplying by 1/${whole}. ${numer}/${denom} × 1/${whole} = ${numer}/${ansDenom}.`});
+    }
+    // Whole number ÷ proper fraction
+    for (let i = 0; i < 8; i++) {
+      const whole = 2 + Math.floor(r() * 6);
+      const denom = pick([2,3,4,5], r);
+      const numer = 1; // keep simple: 1/n
+      const ans = whole * denom;
+      const {opts, a} = wrongOpts(ans, r, 1, 60);
+      qs.push({q:`${whole} ÷ ${numer}/${denom} = ?`, opts, a, topic:"MPAH 6A · Whole ÷ fraction", exp:`Dividing by 1/${denom} = multiplying by ${denom}. ${whole} × ${denom} = ${ans}.`});
+    }
+    // Fraction ÷ fraction
+    const fracDivPairs = [
+      [[1,2],[1,4],'2'],[[3,4],[1,2],'3/2 = 1 1/2'],[[2,3],[1,3],'2'],
+      [[1,4],[1,8],'2'],[[3,5],[1,5],'3'],[[2,3],[1,6],'4'],
+    ];
+    for (const [[a1n, a1d], [b1n, b1d], display] of fracDivPairs) {
+      const correct = display.split(' = ').pop();
+      const distractors = [
+        `${a1n * b1n}/${a1d * b1d}`,
+        `${a1d * b1n}`,
+        `${a1n + b1n}/${a1d + b1d}`,
+      ].filter(x => x !== correct).slice(0, 3);
+      const all = [correct, ...distractors];
+      const shuffled = shuffle4(all, r);
+      qs.push({q:`${a1n}/${a1d} ÷ ${b1n}/${b1d} = ?`, opts: shuffled, a: shuffled.indexOf(correct), topic:"MPAH 6A · Fraction ÷ fraction", exp:`Dividing by a fraction = multiplying by its reciprocal. ${a1n}/${a1d} × ${b1d}/${b1n} = ${correct}.`});
+    }
+    // Ratio — basic
+    const ratioBasic = [
+      ['Simplify 6:9','2:3','Both ÷ 3.'],
+      ['Simplify 8:12','2:3','Both ÷ 4.'],
+      ['Simplify 10:15','2:3','Both ÷ 5.'],
+      ['Simplify 4:8','1:2','Both ÷ 4.'],
+      ['Simplify 9:12','3:4','Both ÷ 3.'],
+      ['Simplify 14:21','2:3','Both ÷ 7.'],
+      ['Simplify 6:12:18','1:2:3','All ÷ 6.'],
+      ['Simplify 4:6:10','2:3:5','All ÷ 2.'],
+    ];
+    for (const [q, correct, exp] of ratioBasic) {
+      const distractors = ['1:2','2:3','3:4','1:3','3:5','2:5','1:2:3','2:3:5'].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, shuffle4(distractors, r).slice(0, 3), r);
+      qs.push({q, opts, a, topic:"MPAH 6A · Ratio simplify", exp});
+    }
+    // Equivalent ratios
+    for (let i = 0; i < 8; i++) {
+      const a1 = 1 + Math.floor(r() * 5);
+      const b1 = 1 + Math.floor(r() * 5) + a1;
+      const k = 2 + Math.floor(r() * 5);
+      const correct = `${a1 * k}:${b1 * k}`;
+      const distractors = [`${a1 + k}:${b1 + k}`, `${a1 * k}:${b1}`, `${a1}:${b1 * k}`].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, distractors.slice(0, 3), r);
+      qs.push({q:`Which is equivalent to ${a1}:${b1}?`, opts, a, topic:"MPAH 6A · Equivalent ratio", exp:`Multiply both terms by ${k}: ${a1}×${k}:${b1}×${k} = ${correct}.`});
+    }
+    // Ratio word problems
+    qs.push({q:`The ratio of boys to girls is 3:5. There are 24 students. How many girls?`, opts:['9','12','15','18'], a:2, topic:"MPAH 6A · Ratio problems", exp:`Total parts = 3+5 = 8. 1 part = 24÷8 = 3 students. Girls = 5×3 = 15.`});
+    qs.push({q:`A and B share $60 in ratio 2:3. How much does B get?`, opts:['$24','$30','$36','$40'], a:2, topic:"MPAH 6A · Ratio problems", exp:`Total parts = 5. 1 part = $12. B = 3×$12 = $36.`});
+    qs.push({q:`The ratio of cats to dogs to rabbits is 1:2:4. There are 28 animals. How many dogs?`, opts:['4','7','8','12'], a:2, topic:"MPAH 6A · Ratio problems", exp:`Total parts = 1+2+4 = 7. 1 part = 4. Dogs = 2×4 = 8.`});
+    qs.push({q:`Mix red and blue in ratio 3:2 to make 25 L paint. How much red?`, opts:['10 L','12 L','15 L','18 L'], a:2, topic:"MPAH 6A · Ratio problems", exp:`Total parts = 5. 1 part = 5 L. Red = 3×5 = 15 L.`});
+    // Ratio ↔ fraction
+    qs.push({q:`If A:B = 2:3, then A is what fraction of A+B?`, opts:['1/3','2/5','3/5','2/3'], a:1, topic:"MPAH 6A · Ratio ↔ fraction", exp:`A = 2 parts of total 5 parts → 2/5.`});
+    qs.push({q:`If A:B = 1:4, then B is what fraction of A+B?`, opts:['1/5','1/4','3/5','4/5'], a:3, topic:"MPAH 6A · Ratio ↔ fraction", exp:`B = 4 parts of total 5 parts → 4/5.`});
+    // Percentage — find whole given part
+    qs.push({q:`30% of a number is 60. What is the number?`, opts:['90','150','180','200'], a:3, topic:"MPAH 6B · % find whole", exp:`30% = 60, so 100% = 60 ÷ 0.30 = 200.`});
+    qs.push({q:`25% of a number is 35. What is the number?`, opts:['70','100','125','140'], a:3, topic:"MPAH 6B · % find whole", exp:`25% = 35, 100% = 35×4 = 140.`});
+    qs.push({q:`80% of the students passed. 240 passed. How many students total?`, opts:['200','280','300','360'], a:2, topic:"MPAH 6B · % find whole", exp:`80% = 240, 100% = 240÷0.8 = 300.`});
+    // Percentage increase / decrease
+    qs.push({q:`A price went from $50 to $60. Percentage increase:`, opts:['10%','15%','20%','25%'], a:2, topic:"MPAH 6B · % change", exp:`Increase = $10. % = 10/50 × 100 = 20%.`});
+    qs.push({q:`A price went from $80 to $60. Percentage decrease:`, opts:['20%','25%','30%','40%'], a:1, topic:"MPAH 6B · % change", exp:`Decrease = $20. % = 20/80 × 100 = 25%.`});
+    qs.push({q:`A salary increased from $2000 to $2400. Percentage increase:`, opts:['15%','20%','25%','40%'], a:1, topic:"MPAH 6B · % change", exp:`Increase = $400. % = 400/2000 × 100 = 20%.`});
+    qs.push({q:`A book's price dropped from $40 to $30. Percentage decrease:`, opts:['20%','25%','30%','33%'], a:1, topic:"MPAH 6B · % change", exp:`Decrease = $10. % = 10/40 × 100 = 25%.`});
+    // Algebra — simple expressions
+    for (let i = 0; i < 10; i++) {
+      const x = 1 + Math.floor(r() * 8);
+      const a1 = 2 + Math.floor(r() * 6);
+      const b1 = 1 + Math.floor(r() * 5);
+      const ans = a1 * x + b1;
+      const {opts, a} = wrongOpts(ans, r, 0, 80);
+      qs.push({q:`If x = ${x}, find ${a1}x + ${b1}.`, opts, a, topic:"MPAH 6A · Algebra (substitute)", exp:`${a1}×${x} + ${b1} = ${a1*x} + ${b1} = ${ans}.`});
+    }
+    // Simplify algebra
+    qs.push({q:`Simplify: 3x + 5x`, opts:['8','8x','15x','3x+5'], a:1, topic:"MPAH 6A · Algebra simplify", exp:`Same letter, add coefficients: 3x + 5x = 8x.`});
+    qs.push({q:`Simplify: 7y - 2y`, opts:['5','5y','9y','5y²'], a:1, topic:"MPAH 6A · Algebra simplify", exp:`7y - 2y = 5y.`});
+    qs.push({q:`Simplify: 4a + 3 + 2a + 5`, opts:['6a + 8','6a + 15','14a','9a + 5'], a:0, topic:"MPAH 6A · Algebra simplify", exp:`Like terms: 4a+2a = 6a, 3+5 = 8. Result: 6a + 8.`});
+    qs.push({q:`Simplify: 5x + 3 - x + 2`, opts:['4x + 5','5x + 5','6x + 5','4x + 1'], a:0, topic:"MPAH 6A · Algebra simplify", exp:`5x - x = 4x; 3 + 2 = 5. Result: 4x + 5.`});
+    // Solve simple equations
+    for (let i = 0; i < 10; i++) {
+      const ans = 1 + Math.floor(r() * 12);
+      const a1 = 2 + Math.floor(r() * 5);
+      const b1 = 1 + Math.floor(r() * 10);
+      const eq = `${a1}x + ${b1} = ${a1 * ans + b1}`;
+      const {opts, a} = wrongOpts(ans, r, 1, 20);
+      qs.push({q:`Solve: ${eq}`, opts: opts.map(o => `x = ${o}`), a, topic:"MPAH 6A · Solve equation", exp:`Subtract ${b1} from both sides → ${a1}x = ${a1*ans}. Divide by ${a1} → x = ${ans}.`});
+    }
+    // Circles — radius/diameter
+    qs.push({q:`Radius = 5 cm. Diameter = ?`, opts:['2.5 cm','5 cm','10 cm','25 cm'], a:2, topic:"MPAH 6B · Circles", exp:`Diameter = 2 × radius = 10 cm.`});
+    qs.push({q:`Diameter = 14 cm. Radius = ?`, opts:['3.5 cm','7 cm','14 cm','28 cm'], a:1, topic:"MPAH 6B · Circles", exp:`Radius = diameter ÷ 2 = 7 cm.`});
+    // Circumference = πd
+    qs.push({q:`Circumference of a circle, radius 7 cm. Take π = 22/7.`, opts:['22 cm','44 cm','49 cm','154 cm'], a:1, topic:"MPAH 6B · Circumference", exp:`C = 2πr = 2 × 22/7 × 7 = 44 cm.`});
+    qs.push({q:`Circumference of a circle, diameter 14 cm. Take π = 22/7.`, opts:['22 cm','44 cm','77 cm','154 cm'], a:1, topic:"MPAH 6B · Circumference", exp:`C = πd = 22/7 × 14 = 44 cm.`});
+    qs.push({q:`Circumference of a circle, radius 10 cm. Take π = 3.14.`, opts:['31.4 cm','62.8 cm','100 cm','314 cm'], a:1, topic:"MPAH 6B · Circumference", exp:`C = 2πr = 2 × 3.14 × 10 = 62.8 cm.`});
+    // Area = πr²
+    qs.push({q:`Area of a circle, radius 7 cm. Take π = 22/7.`, opts:['22 cm²','44 cm²','154 cm²','308 cm²'], a:2, topic:"MPAH 6B · Circle area", exp:`A = πr² = 22/7 × 49 = 154 cm².`});
+    qs.push({q:`Area of a circle, radius 10 cm. Take π = 3.14.`, opts:['31.4 cm²','62.8 cm²','314 cm²','628 cm²'], a:2, topic:"MPAH 6B · Circle area", exp:`A = πr² = 3.14 × 100 = 314 cm².`});
+    qs.push({q:`Area of a circle, radius 14 cm. Take π = 22/7.`, opts:['44 cm²','154 cm²','616 cm²','1232 cm²'], a:2, topic:"MPAH 6B · Circle area", exp:`A = πr² = 22/7 × 196 = 616 cm².`});
+    qs.push({q:`A semicircle has radius 7 cm. Its area is:`, opts:['38.5 cm²','44 cm²','77 cm²','154 cm²'], a:2, topic:"MPAH 6B · Semicircle", exp:`Half of πr² = ½ × 22/7 × 49 = 77 cm².`});
+    qs.push({q:`A quarter-circle has radius 14 cm. Its area is:`, opts:['77 cm²','154 cm²','308 cm²','616 cm²'], a:1, topic:"MPAH 6B · Quarter circle", exp:`¼ of πr² = ¼ × 22/7 × 196 = 154 cm².`});
+    // Volume — find missing dimension
+    for (let i = 0; i < 8; i++) {
+      const l = 2 + Math.floor(r() * 8);
+      const w = 2 + Math.floor(r() * 8);
+      const h = 2 + Math.floor(r() * 6);
+      const vol = l * w * h;
+      const ans = h;
+      const {opts, a} = wrongOpts(ans, r, 1, 12);
+      qs.push({q:`A cuboid has volume ${vol} cm³, length ${l} cm, width ${w} cm. Find its height:`, opts: opts.map(o => o + ' cm'), a, topic:"MPAH 6B · Volume (find dim)", exp:`h = V ÷ (l×w) = ${vol} ÷ ${l*w} = ${ans} cm.`});
+    }
+    for (let i = 0; i < 6; i++) {
+      const side = 2 + Math.floor(r() * 6);
+      const vol = side ** 3;
+      const ans = side;
+      const {opts, a} = wrongOpts(ans, r, 1, 10);
+      qs.push({q:`A cube has volume ${vol} cm³. Find the length of one edge:`, opts: opts.map(o => o + ' cm'), a, topic:"MPAH 6B · Cube edge", exp:`Cube root of ${vol} = ${ans}. Check: ${ans}³ = ${vol}.`});
+    }
+    // Average — moved here from P5
+    for (let i = 0; i < 12; i++) {
+      const n = 3 + Math.floor(r() * 4);
+      const avg = 5 + Math.floor(r() * 25);
+      const total = avg * n;
+      const ans = avg;
+      const {opts, a} = wrongOpts(ans, r, 1, 60);
+      qs.push({q:`The total of ${n} numbers is ${total}. The average is:`, opts, a, topic:"MPAH 6B · Average", exp:`Average = total ÷ count = ${total} ÷ ${n} = ${ans}.`});
+    }
+    qs.push({q:`Marks: 80, 75, 90, 85. Average:`, opts:['80','82.5','85','90'], a:1, topic:"MPAH 6B · Average", exp:`Sum = 330. Average = 330 ÷ 4 = 82.5.`});
+    qs.push({q:`Average of 5 numbers is 12. Total is:`, opts:['17','24','60','72'], a:2, topic:"MPAH 6B · Average", exp:`Total = average × count = 12 × 5 = 60.`});
+    qs.push({q:`Average of 4 numbers is 25. Three of them are 20, 30, 25. The fourth is:`, opts:['20','25','30','35'], a:1, topic:"MPAH 6B · Average", exp:`Total = 25×4 = 100. Sum of three = 75. Fourth = 25.`});
+    qs.push({q:`Sam scored an average of 80 in 4 tests. After a 5th test, average rose to 82. The 5th score was:`, opts:['82','86','88','90'], a:3, topic:"MPAH 6B · Average", exp:`First 4 total = 320. After 5: 82×5 = 410. 5th = 410-320 = 90.`});
+    // Angles in composite figures
+    qs.push({q:`In a figure, two angles meet on a straight line. One is 35°. The other is:`, opts:['35°','55°','125°','145°'], a:3, topic:"MPAH 6B · Composite angles", exp:`180° - 35° = 145°.`});
+    qs.push({q:`Three angles meet at a point: 90°, 110°, ?. The unknown:`, opts:['80°','120°','160°','170°'], a:2, topic:"MPAH 6B · Composite angles", exp:`360° - 90° - 110° = 160°.`});
+    qs.push({q:`In an isosceles triangle, the apex angle is 40°. Each base angle:`, opts:['40°','50°','70°','80°'], a:2, topic:"MPAH 6B · Composite angles", exp:`Two base angles equal. (180-40) ÷ 2 = 70°.`});
+    qs.push({q:`Vertically opposite angles are always:`, opts:['equal','supplementary','complementary','right'], a:0, topic:"MPAH 6B · Composite angles", exp:`Vertically opposite angles are always equal.`});
+  }
+
   _procMathCache[lvl] = qs;
   return qs;
 }
@@ -2721,6 +2887,130 @@ function getProceduralEnglish(lvl) {
       const { opts, a } = buildOpts(correct, distractors, r);
       qs.push({q, opts, a, topic:"STELLAR P5 · S&T prep", exp});
     }
+    _procEnglishCache[lvl] = qs;
+    return qs;
+  }
+
+  // ===== P6 — STELLAR P6 / PSLE prep =====
+  // Topics: comprehensive synthesis & transformation, grammar cloze with
+  // collocations, comprehension inference, editing for spelling & grammar,
+  // vocabulary cloze, advanced idioms and proverbs, situational vocabulary.
+  if (lvl === 'P6') {
+    const r = rng(5061);
+    // Synthesis & Transformation — combine sentences (PSLE staple)
+    const synthP6 = [
+      ['Combine: "John was tired. He completed the task." (use "Despite")', 'Despite being tired, John completed the task.', '"Despite + noun/gerund" — no main verb after "Despite".'],
+      ['Combine: "The cake was delicious. Mary baked it." (use "which")', 'The cake which Mary baked was delicious.', 'Relative clause "which Mary baked" describes the cake.'],
+      ['Combine: "It rained heavily. We continued playing." (use "Although")', 'Although it rained heavily, we continued playing.', '"Although" introduces a subordinate contrast clause.'],
+      ['Rewrite using "If": "Without water, plants will die."', 'If plants do not have water, they will die.', '"If" makes the condition explicit.'],
+      ['Rewrite passive: "Someone has stolen my bicycle."', 'My bicycle has been stolen.', 'Object becomes subject; "has stolen" → "has been stolen".'],
+      ['Combine: "She is the singer. Her voice is famous." (use "whose")', 'She is the singer whose voice is famous.', '"whose" links possession.'],
+      ['Combine: "He was late. He missed the bus." (use "because")', 'He was late because he missed the bus.', 'Cause comes after "because".'],
+      ['Rewrite using "too": "The bag was very heavy. I could not lift it."', 'The bag was too heavy for me to lift.', '"too…to" = excessive degree preventing action.'],
+      ['Rewrite using "so…that": "The film was very long. We left early."', 'The film was so long that we left early.', '"so…that" expresses cause and effect.'],
+    ];
+    for (const [q, correct, exp] of synthP6) {
+      const distractors = [
+        correct.replace(/which/, 'who'),
+        correct.replace(/Although/, 'Because'),
+        correct.replace(/too /, 'very ').replace(/ to /, ' that I cannot '),
+      ].filter(x => x !== correct).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q, opts, a, topic:"STELLAR P6 · Synthesis & Transformation", exp});
+    }
+    // Grammar cloze — collocations (PSLE-specific)
+    const collocations = [
+      ["She paid ___ attention during class.","close","'pay close attention' — common collocation."],
+      ["He took ___ of the situation.","advantage","'take advantage of' — fixed phrase."],
+      ["They are ___ touch with each other.","in","'in touch with' — fixed phrase."],
+      ["The team made ___ progress this year.","good","'make good progress' is the natural phrase."],
+      ["I lost ___ of time while reading.","track","'lose track of time' — idiomatic."],
+      ["She kept ___ a positive attitude.","up","'keep up' = maintain."],
+      ["The plan was put ___ action.","into","'put into action' = begin executing."],
+      ["He took ___ reading after retirement.","up","'take up' = begin a new activity."],
+      ["The thief was caught ___ the act.","in","'caught in the act' — idiomatic."],
+      ["She broke ___ the news to her family.","to","'broke the news to' someone."],
+    ];
+    for (const [sent, correct, exp] of collocations) {
+      const distractors = ['for','of','in','to','at','with','up','down','close','good','track','advantage','into'].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, shuffle4(distractors, r).slice(0, 3), r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P6 · Grammar cloze", exp});
+    }
+    // Comprehension — inference questions
+    const inference = [
+      ['Mary clutched her bag tightly as she walked through the dark alley. What does this suggest?', 'She was nervous', '"Clutching tightly" + "dark alley" implies fear/nervousness.'],
+      ['Tom\'s eyes lit up when he saw the present. What does this mean?', 'He was excited', 'Eyes "lighting up" is a common expression for joy/excitement.'],
+      ['She hesitated before answering the question. What does "hesitated" suggest?', 'She was unsure', '"Hesitated" implies a pause from uncertainty.'],
+      ['He slammed the door and stormed out. What is he most likely feeling?', 'Angry', '"Slammed" and "stormed" are physical signs of anger.'],
+      ['Sarah\'s shoulders slumped as she read the letter. What does this suggest?', 'Disappointment', '"Slumped shoulders" is a body-language sign of sadness or disappointment.'],
+    ];
+    for (const [q, correct, exp] of inference) {
+      const distractors = ['She was nervous','He was excited','She was unsure','Angry','Disappointment','Confused','Tired','Happy'].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, shuffle4(distractors, r).slice(0, 3), r);
+      qs.push({q, opts, a, topic:"STELLAR P6 · Inference", exp});
+    }
+    // Vocabulary cloze — PSLE level
+    const vocabP6 = [
+      ['The judge gave a ___ verdict after careful deliberation.','impartial','"Impartial" = unbiased, fair to all sides.'],
+      ['His ___ behaviour at dinner embarrassed his parents.','rude','In context, the embarrassment implies bad behaviour.'],
+      ['The teacher praised her ___ work on the project.','meticulous','"Meticulous" = very careful and precise.'],
+      ['Despite the setbacks, he remained ___.','optimistic','"Optimistic" = hopeful despite difficulty.'],
+      ['Her ___ remarks hurt his feelings deeply.','sarcastic','"Sarcastic" = cuttingly ironic.'],
+      ['The ___ smell of the rotten food filled the room.','pungent','"Pungent" = sharply strong, especially smells.'],
+      ['He gave a ___ apology that didn\'t sound sincere.','half-hearted','"Half-hearted" = lacking commitment or enthusiasm.'],
+      ['The ___ scenery took our breath away.','breathtaking','"Breathtaking" = stunningly impressive.'],
+    ];
+    for (const [sent, correct, exp] of vocabP6) {
+      const distractors = shuffle4(vocabP6.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:sent, opts, a, topic:"STELLAR P6 · Vocab cloze", exp});
+    }
+    // Editing — spelling
+    const spelling = [
+      ['Which is spelled correctly?','occurred','Double-c, double-r in "occurred".'],
+      ['Which is spelled correctly?','separate','"Sep-a-rate" — two A\'s, not E-rate.'],
+      ['Which is spelled correctly?','definitely','Often misspelled as "definately".'],
+      ['Which is spelled correctly?','embarrass','Two R\'s, two S\'s.'],
+      ['Which is spelled correctly?','necessary','One C, two S\'s.'],
+      ['Which is spelled correctly?','beginning','Double-N before -ing.'],
+      ['Which is spelled correctly?','accommodate','Two C\'s and two M\'s.'],
+      ['Which is spelled correctly?','recommend','One C, two M\'s.'],
+    ];
+    for (const [q, correct, exp] of spelling) {
+      const variants = {
+        'occurred': ['ocurred','occured','occurrred'],
+        'separate': ['seperate','separete','sepparate'],
+        'definitely': ['definately','definately','defenitely'],
+        'embarrass': ['embarass','emberass','embarrasss'],
+        'necessary': ['neccessary','necesary','neccesary'],
+        'beginning': ['begining','beggining','beginnning'],
+        'accommodate': ['accomodate','acommodate','accommadate'],
+        'recommend': ['reccomend','recomend','reccommend'],
+      };
+      const distractors = variants[correct] || ['','',''];
+      const { opts, a } = buildOpts(correct, distractors.slice(0, 3), r);
+      qs.push({q, opts, a, topic:"STELLAR P6 · Spelling", exp});
+    }
+    // Advanced idioms
+    const idiomsP6 = [
+      ["'A storm in a teacup' means:","A small problem made into a big drama","Idiom for an over-reaction."],
+      ["'Cross that bridge when we come to it' means:","Deal with it later","Idiom about not worrying ahead of time."],
+      [`'A wolf in sheep's clothing' means:`,"Someone who hides bad intentions","Idiom for a deceptive person."],
+      ["'Throw in the towel' means:","Give up","From boxing — surrender."],
+      ["'Read between the lines' means:","Find hidden meaning","Idiom about inferring from context."],
+      ["'When pigs fly' means:","Never","Idiom for impossibility."],
+      ["'A drop in the ocean' means:","A very small amount","Idiom for insignificance."],
+      ["'Get cold feet' means:","Lose courage at the last moment","Idiom for last-minute hesitation."],
+    ];
+    for (const [q, correct, exp] of idiomsP6) {
+      const distractors = shuffle4(idiomsP6.filter(x => x[1] !== correct).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q, opts, a, topic:"STELLAR P6 · Idioms", exp});
+    }
+    // Punctuation
+    qs.push({q:`Which uses correct punctuation?`, opts:[`I bought apples, oranges, and pears.`,`I bought apples oranges and pears.`,`I bought; apples, oranges, and pears.`,`I bought apples, oranges and; pears.`], a:0, topic:"STELLAR P6 · Punctuation", exp:`Items in a list separated by commas; final "and" is standard.`});
+    qs.push({q:`Which uses correct punctuation?`, opts:[`"Are you coming"? she asked.`,`"Are you coming?" she asked.`,`"Are you coming?", she asked.`,`Are you coming? "she asked".`], a:1, topic:"STELLAR P6 · Punctuation", exp:`Question mark goes inside the quote; period after "asked".`});
+    qs.push({q:`Which uses an apostrophe correctly?`, opts:[`The dogs collar.`,`The dog's collar.`,`The dogs' collar.`,`The dog,s collar.`], a:1, topic:"STELLAR P6 · Apostrophe", exp:`Singular possessive: dog's collar.`});
     _procEnglishCache[lvl] = qs;
     return qs;
   }
@@ -3380,6 +3670,150 @@ function getProceduralChinese(lvl) {
     }
     _procChineseCache[lvl] = qs;
     return qs;
+  }
+
+  // ===== P6 — 欢乐伙伴 6A/6B / PSLE prep =====
+  // Topics: comprehensive 成语 (PSLE-favourite list), 改写句子 (rewriting),
+  // advanced 病句修改, 看图作文 vocabulary, oral conversation prep,
+  // proverbs and 歇后语 (two-part sayings).
+  if (lvl === 'P6') {
+    const r = rng(7061);
+    // Comprehensive PSLE 成语 list
+    const chengyuP6 = [
+      ['专心致志','zhuān xīn zhì zhì','focus completely on'],
+      ['一鸣惊人','yī míng jīng rén','astonish the world with one feat'],
+      ['全力以赴','quán lì yǐ fù','give it your all'],
+      ['坐井观天','zuò jǐng guān tiān','have a narrow worldview (lit: sit in a well, see only the sky)'],
+      ['滴水成冰','dī shuǐ chéng bīng','extremely cold (lit: water freezes as it drops)'],
+      ['一帆风顺','yī fān fēng shùn','smooth sailing all the way'],
+      ['坚持不懈','jiān chí bù xiè','persevere without slacking'],
+      ['日新月异','rì xīn yuè yì','changing daily, advancing every month'],
+      ['五湖四海','wǔ hú sì hǎi','from all over the country/world'],
+      ['不可思议','bù kě sī yì','unbelievable, inconceivable'],
+      ['精益求精','jīng yì qiú jīng','strive for ever-better quality'],
+      ['一目了然','yī mù liǎo rán','clear at a glance'],
+      ['络绎不绝','luò yì bù jué','endless stream (of people, traffic)'],
+      ['川流不息','chuān liú bù xī','flowing endlessly like a river'],
+    ];
+    for (const [cy, py, en] of chengyuP6) {
+      const distractors = shuffle4(chengyuP6.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${cy} (${py}) means:`, opts, a, topic:"欢乐伙伴 6A · 成语", exp:`${cy} = ${en}.`});
+    }
+    for (const [cy, py, en] of chengyuP6) {
+      const distractors = shuffle4(chengyuP6.filter(x => x[0] !== cy).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(cy, distractors, r);
+      qs.push({q:`Which 成语 means "${en}"?`, opts, a, topic:"欢乐伙伴 6A · 成语", exp:`${en} = ${cy}.`});
+    }
+    // 成语 in context — fill in the blank
+    const chengyuContext = [
+      ['他对学习_____, 取得了优异的成绩。','专心致志','focus completely on something.'],
+      ['这次比赛, 他_____, 终于赢了第一名。','全力以赴','go all-out for victory.'],
+      ['这位运动员_____地训练, 成功打破了世界纪录。','坚持不懈','persevere — never give up.'],
+      ['新加坡的发展_____, 一年一个样子。','日新月异','rapid daily change.'],
+      ['做事要_____, 才能不断进步。','精益求精','always strive for better quality.'],
+    ];
+    for (const [sent, correct, exp] of chengyuContext) {
+      const distractors = shuffle4(chengyuP6.filter(x => x[0] !== correct).map(x => x[0]), r).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q:`填空: ${sent}`, opts, a, topic:"欢乐伙伴 6A · 成语应用", exp});
+    }
+    // 改写句子 (sentence rewriting) — direct ↔ indirect, voice
+    const rewriteCN = [
+      ['改成被动语态: "妈妈做了晚饭。"','晚饭被妈妈做了。','被动语态: 主语和宾语对调, 加 "被".'],
+      ['改成肯定句: "他不是不知道。"','他知道。','双重否定 = 肯定.'],
+      ['改成反问句: "这件事很难。"','这件事难道不难吗?','反问句 加 "难道...吗".'],
+      ['改成陈述句: "他怎么会迟到呢?"','他不会迟到。','反问句改陈述: 去掉 "怎么会...呢".'],
+    ];
+    for (const [q, correct, exp] of rewriteCN) {
+      const distractors = rewriteCN.filter(x => x[1] !== correct).map(x => x[1]).slice(0, 3);
+      const { opts, a } = buildOpts(correct, distractors, r);
+      qs.push({q, opts, a, topic:"欢乐伙伴 6A · 改写", exp});
+    }
+    // Advanced 病句修改
+    const sickP6 = [
+      ['他每天都会按时到校上学。','正确','句子完整通顺.'],
+      ['通过这次比赛, 使他获得了信心。','缺主语','"通过...使..." 句中没有主语 — 应去掉 "通过" 或 "使".'],
+      ['他大概一定会来。','矛盾','"大概" 表不确定, "一定" 表确定 — 矛盾.'],
+      ['我们应该提高节约用水的习惯。','搭配不当','"提高 + 习惯" 不搭配, 应是 "养成节约用水的习惯".'],
+      ['他不仅会唱歌, 也会跳舞, 而且会画画。','逻辑乱','"不仅...也...而且" 应只用一对.'],
+    ];
+    for (const [sent, problemType, exp] of sickP6) {
+      const opts = ['正确','缺主语','矛盾','搭配不当','逻辑乱'];
+      const a = opts.indexOf(problemType);
+      qs.push({q:`这个句子有什么问题? "${sent}"`, opts, a, topic:"欢乐伙伴 6A · 病句", exp});
+    }
+    // 谚语 + 歇后语
+    const proverbsP6 = [
+      ['玉不琢,不成器','Jade unpolished cannot be a tool','To become useful, one must be refined through training.'],
+      ['路遥知马力,日久见人心',`Distance reveals the horse's strength, time reveals the heart`,'Character is shown over time.'],
+      ['书山有路勤为径','The path up the mountain of books is diligence','Diligence is the way to learning.'],
+      ['一年之计在于春',`The year's plan is set in spring`,'Plan early in any cycle.'],
+      ['只要功夫深, 铁杵磨成针','With enough effort, an iron rod can be ground into a needle','Persistence achieves the impossible.'],
+    ];
+    for (const [cn, en, exp] of proverbsP6) {
+      const distractors = shuffle4(proverbsP6.filter(x => x[1] !== en).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`"${cn}" 的意思:`, opts, a, topic:"欢乐伙伴 6A · 谚语", exp});
+    }
+    // 关联词 (PSLE level)
+    const connectorsP6 = [
+      ['___你不努力, ___ 不会成功。','如果...就','假设条件: 如果...就...'],
+      ['他___爱看书, ___ 爱写作。','既...又','并列: 既...又... 表两个动作并存.'],
+      ['___下大雨了, ___我们继续比赛。','尽管...但是','转折: 尽管...但是...'],
+      ['___ 你说得对, ___ 我应该改正。','既然...就','根据某事实推断: 既然...就...'],
+      ['___ 多么困难, ___ 不放弃。','无论...都','无条件: 无论...都...'],
+    ];
+    for (const [sent, correct, exp] of connectorsP6) {
+      const distractors = ['如果...就','既...又','尽管...但是','既然...就','无论...都','虽然...但是','只有...才'].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, shuffle4(distractors, r).slice(0, 3), r);
+      qs.push({q:`填空: ${sent}`, opts, a, topic:"欢乐伙伴 6A · 关联词", exp});
+    }
+    // PSLE-level 反义词
+    const antonymsP6 = [
+      ['谦虚','骄傲','humble/proud'],
+      ['团结','分裂','united/divided'],
+      ['谨慎','大意','cautious/careless'],
+      ['宽广','狭窄','wide/narrow'],
+      ['丰富','贫乏','abundant/scarce'],
+      ['详细','简略','detailed/brief'],
+      ['先进','落后','advanced/backward'],
+      ['真诚','虚假','sincere/insincere'],
+    ];
+    for (const [w1, w2, en] of antonymsP6) {
+      const distractors = shuffle4(antonymsP6.filter(x => x[1] !== w2).map(x => x[1]), r).slice(0, 3);
+      const { opts, a } = buildOpts(w2, distractors, r);
+      qs.push({q:`反义词 of ${w1} (${en.split('/')[0]}):`, opts, a, topic:"欢乐伙伴 6A · 反义词", exp:`${w1} ↔ ${w2}.`});
+    }
+    // Comprehension-style vocabulary
+    const compVocab = [
+      ['他听了这个消息, _____ 地笑了。','开心','开心 = happy. 适合积极语境.'],
+      ['面对困难, 我们要保持_____ 的态度。','积极','积极 = positive/proactive.'],
+      ['老师对我们的进步感到非常_____。','欣慰','欣慰 = pleased/gratified — formal positive.'],
+      ['这件事让全班同学_____。','感动','感动 = moved emotionally.'],
+      ['他的成绩进步很大, 真的让人_____。','佩服','佩服 = admire/respect.'],
+    ];
+    for (const [sent, correct, exp] of compVocab) {
+      const distractors = ['开心','积极','欣慰','感动','佩服','失望','骄傲','感激'].filter(x => x !== correct);
+      const { opts, a } = buildOpts(correct, shuffle4(distractors, r).slice(0, 3), r);
+      qs.push({q:`填空: ${sent}`, opts, a, topic:"欢乐伙伴 6A · 词语应用", exp});
+    }
+    // PSLE oral / conversation vocab
+    const oralVocab = [
+      ['新加坡','xīn jiā pō','Singapore'],
+      ['国庆日','guó qìng rì','National Day'],
+      ['传统文化','chuán tǒng wén huà','traditional culture'],
+      ['环境保护','huán jìng bǎo hù','environmental protection'],
+      ['节约能源','jié yuē néng yuán','save energy'],
+      ['循环再利用','xún huán zài lì yòng','recycle'],
+      ['身心健康','shēn xīn jiàn kāng','physical and mental health'],
+      ['网络安全','wǎng luò ān quán','online safety'],
+    ];
+    for (const [ch, py, en] of oralVocab) {
+      const distractors = shuffle4(oralVocab.filter(x => x[2] !== en).map(x => x[2]), r).slice(0, 3);
+      const { opts, a } = buildOpts(en, distractors, r);
+      qs.push({q:`${ch} (${py}) means:`, opts, a, topic:"欢乐伙伴 6A · 时事词语", exp:`${ch} = ${en}.`});
+    }
   }
 
   _procChineseCache[lvl] = qs;
@@ -6292,7 +6726,7 @@ function buildStartScreen(mode) {
         <div class="level-card" data-level="P3"><div class="check-badge">✓</div><div class="code">P3</div><div class="age">Age 9</div></div>
         <div class="level-card" data-level="P4"><div class="check-badge">✓</div><div class="code">P4</div><div class="age">Age 10</div></div>
         <div class="level-card" data-level="P5"><div class="check-badge">✓</div><div class="code">P5</div><div class="age">Age 11</div></div>
-        <div class="level-card coming-soon" data-level="P6"><div class="code">P6</div><div class="age">Coming soon</div></div>
+        <div class="level-card" data-level="P6"><div class="check-badge">✓</div><div class="code">P6</div><div class="age">PSLE</div></div>
       </div>
       <div class="label">Subject</div>
       <div class="subject-grid" id="subjectGrid">
@@ -6882,6 +7316,10 @@ const ADMIN_TRACKS = [
   { mode: 'kids', level: 'P5', subject: 'english' },
   { mode: 'kids', level: 'P5', subject: 'chinese' },
   { mode: 'kids', level: 'P5', subject: 'mixed' },
+  { mode: 'kids', level: 'P6', subject: 'math' },
+  { mode: 'kids', level: 'P6', subject: 'english' },
+  { mode: 'kids', level: 'P6', subject: 'chinese' },
+  { mode: 'kids', level: 'P6', subject: 'mixed' },
   { mode: 'adults', level: 'beginner', subject: 'korean' },
 ];
 
