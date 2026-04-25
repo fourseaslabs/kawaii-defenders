@@ -232,6 +232,17 @@ body::before {
   display:block; margin-top:6px;
   font-size:13px; font-weight:500; color:#2E7D32; line-height:1.4;
 }
+.correct-reveal .continue-btn {
+  display:block; margin:12px auto 2px; padding:10px 28px;
+  background:#2B9B63; color:white;
+  border:2.5px solid var(--ink); border-radius:14px;
+  box-shadow:0 4px 0 var(--ink);
+  font-family:'Fredoka',sans-serif; font-weight:700; font-size:16px;
+  cursor:pointer; letter-spacing:0.5px;
+  transition:transform 0.1s ease, box-shadow 0.1s ease;
+}
+.correct-reveal .continue-btn:active { transform:translateY(2px); box-shadow:0 2px 0 var(--ink); }
+.correct-reveal .continue-btn:focus { outline:none; box-shadow:0 4px 0 var(--ink), 0 0 0 3px rgba(43,155,99,0.3); }
 @keyframes revealPop { from{transform:scale(0.5); opacity:0;} to{transform:scale(1); opacity:1;} }
 
 /* Study cards */
@@ -6388,23 +6399,43 @@ function renderQuizQuestion() {
         audio.play('correct');
         state.quizCorrect++;
         state.totalCorrect++;
+        // Brief positive feedback then auto-advance — the player got it
+        // right and doesn't need extra time to study the explanation.
+        setTimeout(() => {
+          state.quizIndex++;
+          if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
+          else renderQuizQuestion();
+        }, 650);
       } else {
         btn.classList.add('wrong');
         audio.play('wrong');
         const cb = overlay.querySelector(`.q-option[data-i="${q.a}"]`);
         if (cb) cb.classList.add('correct');
-        // Show the correct answer + explanation so the user learns
+        // Show the correct answer + explanation so the user learns. Wait
+        // for the user to tap Continue — auto-advancing made it impossible
+        // to actually read the explanation, especially on long ones or
+        // for younger readers.
         const reveal = document.createElement('div');
         reveal.className = 'correct-reveal';
-        reveal.innerHTML = `✅ Correct answer: <b>${q.opts[q.a]}</b>${q.exp ? `<span class="exp-text">💡 ${q.exp}</span>` : ''}`;
+        reveal.innerHTML = `
+          ✅ Correct answer: <b>${q.opts[q.a]}</b>
+          ${q.exp ? `<span class="exp-text">💡 ${q.exp}</span>` : ''}
+          <button class="continue-btn" id="quizContinueBtn">Continue →</button>
+        `;
         const card = overlay.querySelector('.question-card');
         if (card) card.appendChild(reveal);
+        const contBtn = document.getElementById('quizContinueBtn');
+        if (contBtn) {
+          contBtn.addEventListener('click', () => {
+            audio.play('click');
+            state.quizIndex++;
+            if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
+            else renderQuizQuestion();
+          });
+          // Autofocus so Enter/space also works on keyboard.
+          contBtn.focus();
+        }
       }
-      setTimeout(() => {
-        state.quizIndex++;
-        if (state.quizIndex >= state.quizQuestions.length) showQuizSummary();
-        else renderQuizQuestion();
-      }, correct ? 650 : 2000);
     });
   });
 }
