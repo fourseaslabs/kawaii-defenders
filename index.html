@@ -5016,13 +5016,33 @@ const progress = {
         for (const id of cloud[k].seen) ls.add(id);
         merged[k].seen = [...ls];
       }
-      if (cloud[k].mistakes) {
-        const lm = new Set(merged[k].mistakes || []);
-        for (const id of cloud[k].mistakes) lm.add(id);
-        // Remove from mistakes if it's been seen (mastered) in the other source
-        const seenSet = new Set(merged[k].seen || []);
-        // Keep mistakes that are STILL in both — if cloud has it mastered, remove
-        merged[k].mistakes = [...lm];
+      // Mistakes merge needs care. Naive union (cloud ∪ local) resurrects
+      // questions the user has just mastered locally — if local.mistakes=[] but
+      // cloud.mistakes=['q5'] (stale), union gives ['q5'] back. The right
+      // semantic: if a question is in local.seen but NOT in local.mistakes,
+      // the user has mastered it on this device, and cloud's stale mistake
+      // should NOT bring it back. Conversely, if cloud says it's a mistake
+      // and local hasn't seen it yet, take cloud's word for it.
+      if (cloud[k].mistakes || cloud[k].seen) {
+        const localMistakes = new Set(merged[k].mistakes || []);
+        const localSeen = new Set(merged[k].seen || []);
+        const cloudMistakes = new Set(cloud[k].mistakes || []);
+        const cloudSeen = new Set(cloud[k].seen || []);
+        const finalMistakes = new Set();
+        // For every mistake from either side, decide: keep or drop?
+        const candidates = new Set([...localMistakes, ...cloudMistakes]);
+        for (const id of candidates) {
+          // If local has seen this AND not in local.mistakes → mastered here.
+          // Cloud's stale "still a mistake" doesn't get to resurrect it.
+          if (localSeen.has(id) && !localMistakes.has(id)) continue;
+          // Same logic flipped: if cloud has seen + not in cloud.mistakes →
+          // mastered there. Drop the local mistake (other device is fresher
+          // for this id).
+          if (cloudSeen.has(id) && !cloudMistakes.has(id)) continue;
+          // Otherwise keep it as a mistake (still pending mastery somewhere).
+          finalMistakes.add(id);
+        }
+        merged[k].mistakes = [...finalMistakes];
       }
       // Merge boss rewards (rw_ keys). Two-part strategy:
       //
