@@ -3059,7 +3059,7 @@ const CN_PINYIN = {
   '伙':'huǒ','伴':'bàn','伙伴':'huǒ bàn',
   // Body
   '头':'tóu','手':'shǒu','脚':'jiǎo','口':'kǒu','耳':'ěr','目':'mù','眼':'yǎn','睛':'jīng','眼睛':'yǎn jīng',
-  '心':'xīn','身':'shēn','脑':'nǎo','嘴':'zuǐ','毛':'máo',
+  '心':'xīn','身':'shēn','脑':'nǎo','嘴':'zuǐ','毛':'máo','毛病':'máo bìng','下面':'xià miàn',
   // Animals
   '猫':'māo','狗':'gǒu','鸟':'niǎo','鱼':'yú','马':'mǎ','牛':'niú','羊':'yáng','猪':'zhū','鸡':'jī',
   '兔':'tù','虎':'hǔ','龙':'lóng','蛇':'shé','蛙':'wā','蛇':'shé','熊':'xióng','象':'xiàng',
@@ -4002,7 +4002,7 @@ function getProceduralChinese(lvl) {
     for (const [sent, problemType, exp] of sickSentences) {
       const opts = ['正确','重复','颠倒','缺词'];
       const a = opts.indexOf(problemType);
-      qs.push({q:`这个句子有什么问题? "${sent}"`, opts, a, topic:"欢乐伙伴 5A · 病句", exp});
+      qs.push({q:`下面句子有什么毛病? "${sent}"`, opts, a, topic:"欢乐伙伴 5A · 病句", exp});
     }
     // 反义词 (advanced)
     const antonymsP5 = [
@@ -4136,7 +4136,7 @@ function getProceduralChinese(lvl) {
     for (const [sent, problemType, exp] of sickP6) {
       const opts = ['正确','缺主语','矛盾','搭配不当','逻辑乱'];
       const a = opts.indexOf(problemType);
-      qs.push({q:`这个句子有什么问题? "${sent}"`, opts, a, topic:"欢乐伙伴 6A · 病句", exp});
+      qs.push({q:`下面句子有什么毛病? "${sent}"`, opts, a, topic:"欢乐伙伴 6A · 病句", exp});
     }
     // 谚语 + 歇后语
     const proverbsP6 = [
