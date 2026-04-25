@@ -5507,11 +5507,11 @@ function openTowerPopup(tower) {
         <div style="font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:#4A3D4C;margin-bottom:4px;">🎯 TARGET</div>
         <div style="display:flex;gap:6px;">
           <button class="target-mode-btn ${mode === 'first' ? 'active' : ''}" data-mode="first"
-            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;background:${mode === 'first' ? 'var(--peach)' : 'white'};color:var(--ink);">
+            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;color:var(--ink);transition:background-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;background:${mode === 'first' ? 'var(--peach)' : 'white'};box-shadow:${mode === 'first' ? '0 3px 0 var(--ink)' : '0 1px 0 rgba(0,0,0,0.1)'};">
             ⏩ First
           </button>
           <button class="target-mode-btn ${mode === 'last' ? 'active' : ''}" data-mode="last"
-            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;background:${mode === 'last' ? 'var(--peach)' : 'white'};color:var(--ink);">
+            style="flex:1;padding:7px;border:2px solid var(--ink);border-radius:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;cursor:pointer;color:var(--ink);transition:background-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;background:${mode === 'last' ? 'var(--peach)' : 'white'};box-shadow:${mode === 'last' ? '0 3px 0 var(--ink)' : '0 1px 0 rgba(0,0,0,0.1)'};">
             ⏪ Last
           </button>
         </div>
@@ -5532,8 +5532,9 @@ function openTowerPopup(tower) {
       </div>
     </div>
   `;
-  // Wire target-mode buttons. Apply immediately, persist, and rerender popup
-  // so the active state is visually correct.
+  // Wire target-mode buttons. Apply state immediately and animate the
+  // button transition in-place — re-rendering the popup made the change
+  // feel invisible.
   popup.querySelectorAll('.target-mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const newMode = btn.dataset.mode;
@@ -5541,8 +5542,16 @@ function openTowerPopup(tower) {
       tower.targetMode = newMode;
       audio.play('click');
       persistSession();
-      // Re-open popup to reflect the new active button.
-      showTowerPopup(tower);
+      // Update both buttons' visual state without rebuilding the popup.
+      popup.querySelectorAll('.target-mode-btn').forEach(other => {
+        const isActive = other.dataset.mode === newMode;
+        other.classList.toggle('active', isActive);
+        other.style.background = isActive ? 'var(--peach)' : 'white';
+        other.style.boxShadow = isActive ? '0 3px 0 var(--ink)' : '0 1px 0 rgba(0,0,0,0.1)';
+      });
+      // Quick press animation on the clicked button so the tap registers visually.
+      btn.style.transform = 'scale(1.08)';
+      setTimeout(() => { btn.style.transform = ''; }, 140);
     });
   });
   if (next) {
