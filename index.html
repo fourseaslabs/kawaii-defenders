@@ -667,6 +667,7 @@ body::before {
 
   <div class="hud" id="hud" style="display:none;">
     <button class="back-btn" id="backBtn" title="Back to map">✕</button>
+    <button class="back-btn" id="restartBtn" title="Restart level">↻</button>
     <div class="hud-pill lives">❤️ <span id="livesTxt">5</span></div>
     <div class="hud-pill level">📚 <span id="levelTxt">P1</span> · <span id="levelNumTxt">1</span></div>
     <div class="hud-pill coins">💰 <span id="coinsTxt">60</span></div>
@@ -4680,7 +4681,7 @@ const progress = {
     await this.save();
   },
   // Called when the player loses all lives. Preserves stars, rewards, and claimed
-  // boss rewards, but rolls back the unlocked counter by 5 levels (min 1) and
+  // boss rewards, but rolls back the unlocked counter by 3 levels (min 1) and
   // resets the lives pool to 10. The player must replay those levels to get
   // back to where they were. Any boss levels in that replay window that were
   // already claimed will show a limited re-fight picker.
@@ -4689,7 +4690,7 @@ const progress = {
     if (!this.data[k]) this.data[k] = { unlocked: 1, stars: {} };
     const bucket = this.data[k];
     const before = bucket.unlocked;
-    bucket.unlocked = Math.max(1, before - 5);
+    bucket.unlocked = Math.max(1, before - 3);
     const r = this.getRewards(lvl, subj);
     r.livesPool = STARTING_LIVES_POOL;
     r.livesPoolUpdatedAt = Date.now();
@@ -6307,7 +6308,7 @@ async function gameOver(win) {
   }
 
   // Game-over rewind: player ran out of lives in the track's persistent pool.
-  // Rewind the unlocked counter by 5, reset pool, preserve everything else.
+  // Rewind the unlocked counter by 3, reset pool, preserve everything else.
   if (!win) {
     await progress.clearSession(state.level, state.subject);
     const result = await progress.gameOverRewind(state.level, state.subject);
@@ -6340,7 +6341,7 @@ function showGameOverRewindModal(result) {
       <div class="info" style="margin:14px 0;">
         Don't worry — your rewards and stars are safe! 💖<br><br>
         Your lives have been refilled to <b>❤️ ${STARTING_LIVES_POOL}</b>, and you've been
-        sent back <b>5 levels</b> so you can warm up again.<br><br>
+        sent back <b>3 levels</b> so you can warm up again.<br><br>
         <span style="font-size:13px;color:#6B4FA0;">
           Unlocked: <b>Level ${unlockedBefore}</b> → <b>Level ${unlockedAfter}</b>
         </span>
@@ -6353,6 +6354,49 @@ function showGameOverRewindModal(result) {
     modal.style.display = 'none'; modal.innerHTML = '';
     hideGameplayUI();
     await showJourneyScreen();
+  });
+}
+
+// Confirm-and-restart prompt. Lives are NOT reset — the persistent
+// livesPool already reflects every heart lost so far, and a restart only
+// rewinds the round/tower state. We also discard any saved mid-level
+// session so the resume path doesn't re-load the round we're abandoning.
+function showRestartConfirmModal() {
+  const modal = document.getElementById('levelStartModal');
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="level-start-card">
+      <span class="mascot">↻</span>
+      <h2>Restart this level?</h2>
+      <div class="type">${state.level === 'beginner' ? '초급 (TOPIK I)' : state.level} · ${getSubjectLabel(state.subject)} · Level ${state.levelNum}</div>
+      <div class="info" style="margin:14px 0;">
+        You'll go back to <b>Round 1</b>. Towers and coins reset.<br><br>
+        <span style="font-size:13px;color:#6B4FA0;">
+          Your lives stay the same: <b>❤️ ${state.lives}</b>
+        </span>
+      </div>
+      <button class="start-btn" id="restartConfirmBtn">RESTART ↻</button>
+      <button class="secondary-btn" id="restartCancelBtn" style="margin-top:10px;">Cancel</button>
+    </div>
+  `;
+  document.getElementById('restartCancelBtn').addEventListener('click', () => {
+    audio.play('click');
+    modal.style.display = 'none'; modal.innerHTML = '';
+  });
+  document.getElementById('restartConfirmBtn').addEventListener('click', async () => {
+    audio.play('click');
+    modal.style.display = 'none'; modal.innerHTML = '';
+    // Discard any saved session for this level — we're explicitly starting
+    // over, so the resume path shouldn't reload the abandoned round.
+    await progress.clearSession(state.level, state.subject);
+    // Clear any open popups before restarting.
+    document.getElementById('towerPopup').style.display = 'none';
+    document.getElementById('towerPopup').innerHTML = '';
+    document.getElementById('quizOverlay').style.display = 'none';
+    document.getElementById('quizOverlay').innerHTML = '';
+    // Fresh-start path skips session rehydrate and resets towers/coins/rounds.
+    // Lives are read from rewards.livesPool which is unchanged here.
+    startLevel(state.levelNum, { fresh: true });
   });
 }
 
@@ -6848,6 +6892,13 @@ document.getElementById('backBtn').addEventListener('click', async () => {
   document.getElementById('quizOverlay').style.display = 'none';
   document.getElementById('quizOverlay').innerHTML = '';
   await showJourneyScreen();
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  // Only meaningful while a level is actually being played. Don't allow
+  // restart from the end-of-level screen or before startLevel runs.
+  if (!state.spec || state.phase === 'end') return;
+  audio.play('click');
+  showRestartConfirmModal();
 });
 document.getElementById('sendWaveBtn').addEventListener('click', () => {
   if (state.phase === 'prep') { audio.play('click'); startWave(); }
