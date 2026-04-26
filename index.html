@@ -6106,8 +6106,7 @@ function buildTowerBar() {
   const chipsPerRow = keys.length <= 8 ? keys.length : Math.ceil(keys.length / 2);
   // Each chip gets a percentage basis so all chips in a row are equal width.
   // Subtract a little for gap spacing; flex-basis handles the rest.
-  const basisPct = (100 / chipsPerRow).toFixed(2) + '%';
-  for (const key of keys) {
+  const basisPct = (100 / chipsPerRow).toFixed(2) + '%';  for (const key of keys) {
     const spec = towerSpec(key, 0);
     const chip = document.createElement('div');
     chip.className = 'tower-chip'; chip.dataset.key = key;
@@ -6124,6 +6123,19 @@ function buildTowerBar() {
       if (state.selectedTowerType) flashHint(`Tap a glowing tile to place!`);
     });
     bar.appendChild(chip);
+  }
+  // Reposition the Send Wave button above the tower bar. When the player
+  // unlocks 9+ towers, the bar wraps to two rows and grows ~70px taller —
+  // the button's hardcoded bottom:86px would then sit INSIDE the second
+  // row and block the bottom-row chips. Measure the actual rendered height
+  // and place the button 14px above it. requestAnimationFrame ensures
+  // layout has settled before we read offsetHeight.
+  const sendBtn = document.getElementById('sendWaveBtn');
+  if (sendBtn) {
+    requestAnimationFrame(() => {
+      const barH = bar.offsetHeight || 76;
+      sendBtn.style.bottom = (barH + 14) + 'px';
+    });
   }
 }
 function updateTowerBar() {
