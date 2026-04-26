@@ -4668,7 +4668,9 @@ const TOWER_DEFS = {
     costs:[50, 30, 33, 38, 45, 55, 68, 82, 100, 125],
     range:[1.8, 3.2], dmg:[1, 7], fireRate:[1000, 500],
     colors:['#FFB199','#E53935'], ringColor:'#B71C1C',
-    splash:[0.6, 1.4],  // radius in tiles; splashes at L1 with 0.6 tile radius, 1.4 at L10
+    splash:[1.0, 2.0],  // radius in tiles; L1 splash is ~1 tile (48 px) so
+                        // adjacent path-tile enemies actually get hit. L10
+                        // is 2 tiles for proper area-of-effect feel.
     reward:true,
   },
   ice: {
@@ -4676,7 +4678,7 @@ const TOWER_DEFS = {
     costs:[55, 32, 35, 40, 48, 58, 70, 85, 105, 130],
     range:[2.0, 3.4], dmg:[1, 5], fireRate:[1100, 550],
     colors:['#D6EFFF','#0288D1'], ringColor:'#01579B',
-    splash:[0.5, 1.2],
+    splash:[0.8, 1.6],  // smaller than fire — ice's main value is the slow.
     slow:[0.10, 0.90],  // 10% at L1, +10% per upgrade (capped at 90% at L10 so enemies never freeze entirely)
     reward:true,
   },
@@ -5350,6 +5352,7 @@ const state = {
   towers: [],
   projectiles: [],
   sparkles: [],
+  splashRings: [],   // visual rings shown when splash damage fires
   spawnQueue: [],
   spawnTimer: 0,
   currentWaveIdx: 0,  // index in spec.waves
@@ -5583,6 +5586,9 @@ function updateProjectiles(dt) {
         // Splash: damage all enemies within radius around the impact point.
         if (p.splash) {
           const ix = target.x, iy = target.y;
+          // Visible splash ring at impact so the player can SEE the AoE.
+          // Without this, players don't realize splash is firing.
+          spawnSplashRing(ix, iy, p.splash, p.color);
           // Splash damage is typically reduced vs. direct hit — use 60% for secondary targets.
           const splashDmg = Math.max(1, Math.round(p.dmg * 0.6));
           for (const e of state.enemies.slice()) {
@@ -5651,6 +5657,43 @@ function updateSparkles(dt) {
   }
 }
 
+// Visible splash impact: an expanding ring at the impact point sized to the
+// splash radius. Fades out over ~0.45s. Without this, players have no way to
+// see when their fire/ice tower's splash actually fires — feedback gap that
+// makes players think the splash isn't working.
+function spawnSplashRing(x, y, radiusPx, color) {
+  state.splashRings.push({
+    x, y, r: 0, maxR: radiusPx, color, life: 0.45, max: 0.45,
+  });
+}
+function updateSplashRings(dt) {
+  for (let i = state.splashRings.length - 1; i >= 0; i--) {
+    const sr = state.splashRings[i];
+    // Expand to maxR over the ring's lifetime.
+    const t = 1 - (sr.life / sr.max);
+    sr.r = sr.maxR * t;
+    sr.life -= dt;
+    if (sr.life <= 0) state.splashRings.splice(i, 1);
+  }
+}
+function drawSplashRing(sr) {
+  const alpha = Math.max(0, sr.life / sr.max);
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.strokeStyle = sr.color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(sr.x, sr.y, sr.r, 0, Math.PI * 2);
+  ctx.stroke();
+  // Inner softer fill for an explosive feel.
+  ctx.globalAlpha = alpha * 0.18;
+  ctx.fillStyle = sr.color;
+  ctx.beginPath();
+  ctx.arc(sr.x, sr.y, sr.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 // ============== DRAW ==============
 function draw() {
   const W = state.canvasW, H = state.canvasH;
@@ -5667,6 +5710,9 @@ function draw() {
   for (const t of state.towers) drawTower(t);
   for (const e of state.enemies) drawEnemy(e);
   for (const p of state.projectiles) drawProjectile(p);
+  // Splash rings render under sparkles so the particle burst sits on top of
+  // the expanding ring effect.
+  for (const sr of state.splashRings) drawSplashRing(sr);
   for (const s of state.sparkles) drawSparkle(s);
 }
 
@@ -6643,6 +6689,7 @@ function loop(now) {
     checkWaveEnd();
   }
   updateSparkles(dt);
+  updateSplashRings(dt);
   draw();
   requestAnimationFrame(loop);
 }
@@ -6773,7 +6820,7 @@ function startLevel(levelNum, opts = {}) {
   state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
-  state.sparkles = []; state.spawnQueue = [];
+  state.sparkles = []; state.splashRings = []; state.spawnQueue = [];
   state.gameTime = 0;
   state.running = true;
   state.selectedTowerType = null;
