@@ -5134,22 +5134,30 @@ const progress = {
     bucket.stars[n] = Math.max(bucket.stars[n] || 0, stars);
     await this.save();
   },
-  // Called when the player loses all lives. Preserves stars, rewards, and claimed
-  // boss rewards, but rolls back the unlocked counter by 3 levels (min 1) and
-  // resets the lives pool to 10. The player must replay those levels to get
-  // back to where they were. Any boss levels in that replay window that were
-  // already claimed will show a limited re-fight picker.
-  async gameOverRewind(lvl, subj) {
+  // Called when the player loses all lives. Behavior depends on whether they
+  // failed at the frontier or while replaying an already-cleared level:
+  //   - Frontier (playingLevel >= unlocked): rolls unlocked back by 3 (min 1).
+  //     This is the punishment for genuinely getting stuck.
+  //   - Replay (playingLevel < unlocked): no level rollback. Replaying old
+  //     content is a learning activity and shouldn't punish progress that
+  //     was already earned. Lives still refill.
+  // Stars, rewards, claimed boss rewards, and history are always preserved.
+  // Returns { unlockedBefore, unlockedAfter, rewound } so the UI can show the
+  // right message.
+  async gameOverRewind(lvl, subj, playingLevel) {
     const k = this.key(lvl, subj);
     if (!this.data[k]) this.data[k] = { unlocked: 1, stars: {} };
     const bucket = this.data[k];
     const before = bucket.unlocked;
-    bucket.unlocked = Math.max(1, before - 3);
+    const isFrontier = (typeof playingLevel === 'number') ? (playingLevel >= before) : true;
+    if (isFrontier) {
+      bucket.unlocked = Math.max(1, before - 3);
+    }
     const r = this.getRewards(lvl, subj);
     r.livesPool = STARTING_LIVES_POOL;
     r.livesPoolUpdatedAt = Date.now();
     await this.save();
-    return { unlockedBefore: before, unlockedAfter: bucket.unlocked };
+    return { unlockedBefore: before, unlockedAfter: bucket.unlocked, rewound: isFrontier };
   },
 
   // Question history per grade level (P1/P2/P3). Mixed mode questions are
@@ -6942,10 +6950,12 @@ async function gameOver(win) {
   }
 
   // Game-over rewind: player ran out of lives in the track's persistent pool.
-  // Rewind the unlocked counter by 3, reset pool, preserve everything else.
+  // Lives always refill; the unlocked counter only rewinds if they were
+  // playing at the frontier (passed in as state.levelNum). Replays just get
+  // their lives back without losing progress.
   if (!win) {
     await progress.clearSession(state.level, state.subject);
-    const result = await progress.gameOverRewind(state.level, state.subject);
+    const result = await progress.gameOverRewind(state.level, state.subject, state.levelNum);
     showGameOverRewindModal(result);
     return;
   }
@@ -6966,19 +6976,29 @@ async function gameOver(win) {
 function showGameOverRewindModal(result) {
   const modal = document.getElementById('levelStartModal');
   modal.style.display = 'flex';
-  const { unlockedBefore, unlockedAfter } = result;
+  const { unlockedBefore, unlockedAfter, rewound } = result;
+  // Two copy variants. Rewound: real rewind, frontier failure. Not rewound:
+  // replay of an already-cleared level — just refill lives, no progress lost.
+  const bodyHtml = rewound
+    ? `Don't worry — your rewards and stars are safe! 💖<br><br>
+       Your lives have been refilled to <b>❤️ ${STARTING_LIVES_POOL}</b>, and you've been
+       sent back <b>3 levels</b> so you can warm up again.<br><br>
+       <span style="font-size:13px;color:#6B4FA0;">
+         Unlocked: <b>Level ${unlockedBefore}</b> → <b>Level ${unlockedAfter}</b>
+       </span>`
+    : `No worries — this was a level you'd already cleared, so nothing's lost.<br><br>
+       Your lives have been refilled to <b>❤️ ${STARTING_LIVES_POOL}</b> and you can
+       jump right back in.<br><br>
+       <span style="font-size:13px;color:#6B4FA0;">
+         Unlocked: still <b>Level ${unlockedAfter}</b>
+       </span>`;
   modal.innerHTML = `
     <div class="level-start-card">
-      <span class="mascot">💔</span>
-      <h2>Out of Lives!</h2>
+      <span class="mascot">${rewound ? '💔' : '🔄'}</span>
+      <h2>${rewound ? 'Out of Lives!' : 'Lives Refilled!'}</h2>
       <div class="type">${state.level === 'beginner' ? '초급 (TOPIK I)' : state.level} · ${getSubjectLabel(state.subject)}</div>
       <div class="info" style="margin:14px 0;">
-        Don't worry — your rewards and stars are safe! 💖<br><br>
-        Your lives have been refilled to <b>❤️ ${STARTING_LIVES_POOL}</b>, and you've been
-        sent back <b>3 levels</b> so you can warm up again.<br><br>
-        <span style="font-size:13px;color:#6B4FA0;">
-          Unlocked: <b>Level ${unlockedBefore}</b> → <b>Level ${unlockedAfter}</b>
-        </span>
+        ${bodyHtml}
       </div>
       <button class="start-btn" id="rewindBtn">BACK TO MAP 🗺️</button>
     </div>
