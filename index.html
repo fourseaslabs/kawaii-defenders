@@ -4927,6 +4927,14 @@ function bfsPath(start, end, isBlocked) {
 }
 
 // ============== PROGRESS (localStorage + Firebase cloud sync) ==============
+// Starting lives per (mode, grade, subject) track. Fresh tracks start with
+// this many lives in the persistent pool. Pool depletes as the player loses
+// hearts during play, regenerates back to this value on game-over rewind,
+// and is the source of truth for "how many lives do I have left on this
+// track right now". Defined up here (not at the gameplay code) because
+// progress / merge / migration all need it.
+const STARTING_LIVES_POOL = 50;
+
 const progress = {
   data: null,
   _loaded: false,
@@ -5089,7 +5097,7 @@ const progress = {
           extraCoinsClaims,
           fire, ice, poison, cannon,
           claimed: unionClaimed,
-          livesPool: winner.livesPool != null ? winner.livesPool : 10,
+          livesPool: winner.livesPool != null ? winner.livesPool : STARTING_LIVES_POOL,
           livesPoolUpdatedAt: Math.max(mTs, cTs, Date.now()),
         };
       }
@@ -5179,11 +5187,13 @@ const progress = {
     if (typeof r.extraCoinsClaims !== 'number') r.extraCoinsClaims = 0;
     if (typeof r.cannon !== 'boolean') r.cannon = false;
     if (!r.claimed) r.claimed = {};
-    // Migration: older saves used `extraLivesClaims × 2` applied at level start.
-    // Convert to a persistent pool of 10 + (claims × 10), then retire the counter.
-    // The counter stays at 0 going forward; live pool is the source of truth.
+    // Migration: older saves used `extraLivesClaims × 2` applied at level
+    // start. Convert to a persistent pool of STARTING_LIVES_POOL + (claims ×
+    // 10), so users who claimed extra-lives rewards in the old model don't
+    // lose those bonuses, while users who never claimed start at the
+    // standard 50. The counter retires; livesPool becomes the source of truth.
     if (typeof r.livesPool !== 'number') {
-      r.livesPool = 10 + (r.extraLivesClaims || 0) * 10;
+      r.livesPool = STARTING_LIVES_POOL + (r.extraLivesClaims || 0) * 10;
       r.extraLivesClaims = 0;
       r.livesPoolUpdatedAt = Date.now();
       this.save(); // persist migration
@@ -5207,7 +5217,7 @@ const progress = {
     if (r.claimed[n]) return false; // already claimed this boss
     r.claimed[n] = choice;
     if (choice === 'extraLives') {
-      r.livesPool = (r.livesPool || 10) + 10;
+      r.livesPool = (r.livesPool ?? STARTING_LIVES_POOL) + 10;
       r.livesPoolUpdatedAt = Date.now();
     }
     else if (choice === 'extraCoins') r.extraCoinsClaims++;
@@ -5226,7 +5236,7 @@ const progress = {
     const r = this.getRewards(lvl, subj);
     if (choice !== 'extraLives' && choice !== 'extraCoins') return false;
     if (choice === 'extraLives') {
-      r.livesPool = (r.livesPool || 10) + 10;
+      r.livesPool = (r.livesPool ?? STARTING_LIVES_POOL) + 10;
       r.livesPoolUpdatedAt = Date.now();
     } else {
       r.extraCoinsClaims++;
@@ -6626,9 +6636,6 @@ function loop(now) {
 }
 
 // ============== START / END LEVEL ==============
-// New tracks start with this many lives in their persistent pool.
-// Legacy pools (migrated from the old per-level model) are not affected.
-const STARTING_LIVES_POOL = 50;
 
 // Build a snapshot of the current level state suitable for resume. Captures
 // only PREP-phase-safe fields — towers, wave index, coins, quiz tallies.
@@ -8025,7 +8032,7 @@ function renderAdminEdit(username, email) {
     const p = data[pKey] || {};
     const r = data[rKey] || {};
     const unlocked = p.unlocked || 1;
-    const pool = typeof r.livesPool === 'number' ? r.livesPool : 10;
+    const pool = typeof r.livesPool === 'number' ? r.livesPool : STARTING_LIVES_POOL;
     const coins = r.extraCoinsClaims || 0;
     const label = `${t.level === 'beginner' ? 'Korean' : t.level + ' ' + t.subject}`;
     return `
