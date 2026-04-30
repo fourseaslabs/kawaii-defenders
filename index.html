@@ -5427,6 +5427,17 @@ function computeGrid() {
   const gW = state.tileSize * GRID_COLS;
   state.gridOffX = Math.round((state.canvasW - gW) / 2);
   state.gridOffY = 72;
+  // Towers cache absolute pixel positions in t.x/t.y at placement time
+  // (see placeTower → cellCenter). When the grid resizes — e.g. because
+  // a new tower unlocked and the bar grew, or the device rotated — those
+  // cached coords go stale and towers visually float off their cells.
+  // Refresh them from the canonical (col, row) source of truth.
+  if (state.towers && state.towers.length) {
+    for (const t of state.towers) {
+      const c = cellCenter(t.col, t.row);
+      t.x = c.x; t.y = c.y;
+    }
+  }
 }
 function cellCenter(c, r) { return { x: state.gridOffX + c*state.tileSize + state.tileSize/2, y: state.gridOffY + r*state.tileSize + state.tileSize/2 }; }
 function cellRect(c, r) { return { x: state.gridOffX + c*state.tileSize, y: state.gridOffY + r*state.tileSize, w: state.tileSize, h: state.tileSize }; }
