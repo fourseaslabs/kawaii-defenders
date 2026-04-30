@@ -92,12 +92,15 @@ body::before {
 #gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
 
 /* Send wave */
-.send-wave-btn { position:absolute; bottom:86px; left:50%; transform:translateX(-50%);
-  background:var(--rose); color:white; border:4px solid var(--ink); border-radius:18px;
-  padding:10px 28px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:18px;
-  letter-spacing:1.2px; box-shadow:0 5px 0 var(--ink); cursor:pointer; z-index:11;
+/* Smaller padding/font/border than before — saves ~12px of vertical space
+   so the button + tower bar together don't intrude as far into the play
+   area on phones with 9+ tower rosters. */
+.send-wave-btn { position:absolute; bottom:78px; left:50%; transform:translateX(-50%);
+  background:var(--rose); color:white; border:3px solid var(--ink); border-radius:16px;
+  padding:7px 22px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px;
+  letter-spacing:1px; box-shadow:0 4px 0 var(--ink); cursor:pointer; z-index:11;
   text-shadow:2px 2px 0 rgba(0,0,0,0.15); animation:pulseBtn 1.8s ease-in-out infinite; }
-.send-wave-btn:active { transform:translateX(-50%) translateY(3px); box-shadow:0 2px 0 var(--ink); }
+.send-wave-btn:active { transform:translateX(-50%) translateY(2px); box-shadow:0 2px 0 var(--ink); }
 .send-wave-btn.hidden { display:none; }
 @keyframes pulseBtn { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.05);} }
 
@@ -110,18 +113,23 @@ body::before {
 .back-btn.floating { position:absolute; z-index:12; }
 
 /* Tower bar */
+/* Tighter overall: less padding, smaller chip emoji/cost, smaller chip
+   padding. With 9+ towers wrapping to 2 rows, this saves ~28-32px of
+   vertical bar height so the bar no longer overlaps the bottom path/grid
+   on small phones. Tap targets remain ≥44px effective with the chip
+   padding + the bar's surrounding padding. */
 .tower-bar { position:absolute; bottom:10px; left:8px; right:8px;
-  background:white; border:3px solid var(--ink); border-radius:20px; padding:8px 6px;
-  box-shadow:0 4px 0 var(--ink); display:flex; gap:5px; z-index:10;
+  background:white; border:3px solid var(--ink); border-radius:18px; padding:5px 5px;
+  box-shadow:0 4px 0 var(--ink); display:flex; gap:4px; z-index:10;
   justify-content:space-around; align-items:center; }
-.tower-chip { flex:1; background:var(--cream); border:2px solid var(--ink); border-radius:13px;
-  padding:7px 2px 5px; text-align:center; cursor:pointer; font-family:'Fredoka',sans-serif;
+.tower-chip { flex:1; background:var(--cream); border:2px solid var(--ink); border-radius:11px;
+  padding:4px 2px 3px; text-align:center; cursor:pointer; font-family:'Fredoka',sans-serif;
   transition:transform 0.15s, background 0.15s, box-shadow 0.15s; position:relative; min-width:0; }
 .tower-chip:active { transform:scale(0.94); }
 .tower-chip.selected { background:var(--sun); transform:translateY(-3px); box-shadow:0 3px 0 var(--ink); }
 .tower-chip.disabled { opacity:0.45; }
-.tower-chip .emoji { font-size:26px; display:block; line-height:1; }
-.tower-chip .cost { font-size:10px; color:#A87400; font-weight:700; margin-top:2px; }
+.tower-chip .emoji { font-size:22px; display:block; line-height:1; }
+.tower-chip .cost { font-size:9px; color:#A87400; font-weight:700; margin-top:1px; }
 
 /* Tower upgrade popup */
 .tower-popup { position:absolute; inset:0; background:rgba(61,46,63,0.4);
@@ -5403,7 +5411,18 @@ window.addEventListener('resize', resize);
 
 function computeGrid() {
   const availW = state.canvasW - 16;
-  const availH = state.canvasH - 70 - 80 - 20;
+  // Bottom reservation depends on whether the tower bar is showing and
+  // how tall it is. The bar varies from ~58px (1 row, ≤8 towers) to ~108px
+  // (2 rows, 9+ towers). Reading offsetHeight directly lets players with
+  // small rosters keep larger playfield tiles. Add Send Wave button height
+  // (~38px) + gaps (~14px). Falls back to 80 before the bar exists (initial
+  // layout, screens without a bar).
+  const bar = document.getElementById('towerBar');
+  let bottomReserve = 80;
+  if (bar && bar.style.display !== 'none' && bar.offsetHeight > 0) {
+    bottomReserve = bar.offsetHeight + 52;
+  }
+  const availH = state.canvasH - 70 - bottomReserve - 20;
   state.tileSize = Math.floor(Math.min(availW / GRID_COLS, availH / GRID_ROWS));
   const gW = state.tileSize * GRID_COLS;
   state.gridOffX = Math.round((state.canvasW - gW) / 2);
@@ -6188,18 +6207,20 @@ function buildTowerBar() {
     bar.appendChild(chip);
   }
   // Reposition the Send Wave button above the tower bar. When the player
-  // unlocks 9+ towers, the bar wraps to two rows and grows ~70px taller —
-  // the button's hardcoded bottom:86px would then sit INSIDE the second
-  // row and block the bottom-row chips. Measure the actual rendered height
-  // and place the button 14px above it. requestAnimationFrame ensures
-  // layout has settled before we read offsetHeight.
+  // unlocks 9+ towers, the bar wraps to two rows and grows taller — the
+  // button's CSS bottom:78px assumes a 1-row bar (~58px). Measure the
+  // actual rendered height and place the button 12px above it.
+  // requestAnimationFrame ensures layout has settled before reading
+  // offsetHeight. Fallback 60 matches the new compact 1-row bar height.
+  // Also recompute the grid, since computeGrid reads bar.offsetHeight to
+  // decide how much vertical space to reserve at the bottom — the path
+  // shouldn't draw under the bar.
   const sendBtn = document.getElementById('sendWaveBtn');
-  if (sendBtn) {
-    requestAnimationFrame(() => {
-      const barH = bar.offsetHeight || 76;
-      sendBtn.style.bottom = (barH + 14) + 'px';
-    });
-  }
+  requestAnimationFrame(() => {
+    const barH = bar.offsetHeight || 60;
+    if (sendBtn) sendBtn.style.bottom = (barH + 12) + 'px';
+    if (typeof computeGrid === 'function') computeGrid();
+  });
 }
 function updateTowerBar() {
   document.querySelectorAll('.tower-chip').forEach(chip => {
