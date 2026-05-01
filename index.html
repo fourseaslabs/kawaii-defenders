@@ -5378,6 +5378,7 @@ const state = {
   projectiles: [],
   sparkles: [],
   splashRings: [],   // visual rings shown when splash damage fires
+  popups: [],        // floating text (e.g. "-12" when DoT ticks)
   spawnQueue: [],
   spawnTimer: 0,
   currentWaveIdx: 0,  // index in spec.waves
@@ -5674,6 +5675,18 @@ function updateDots(dt) {
     e.dotTimer -= dt;
     if (e.dotTimer <= 0) {
       const tickDmg = Math.max(1, Math.round((e.dotMaxHp || e.maxHp) * e.dotPct));
+      // Visual: green sparkle burst + floating "-N" popup at the moment
+      // the tick fires. Without these, players couldn't tell the DoT was
+      // doing anything beyond the static green tint.
+      spawnSparkles(e.x, e.y, '#4CAF50', 5);
+      state.popups.push({
+        x: e.x + (Math.random() - 0.5) * 12, y: e.y - 8,
+        vy: -38, life: 0.8, max: 0.8,
+        text: '-' + tickDmg, color: '#1B5E20',
+      });
+      // Brief tick flash flag — drawEnemy reads this and pulses the skull
+      // bigger for ~150ms after the tick lands.
+      e.dotFlash = 0.18;
       const killed = damageEnemy(e, tickDmg, '#8BC34A');
       if (killed) continue; // enemy already removed
       e.dotTicksLeft--;
@@ -5682,7 +5695,47 @@ function updateDots(dt) {
         e.dotPct = 0;
       }
     }
+    // Decay the tick flash regardless of whether a tick fired this frame.
+    if (e.dotFlash) {
+      e.dotFlash -= dt;
+      if (e.dotFlash < 0) e.dotFlash = 0;
+    }
   }
+}
+
+// Floating text popups (currently only DoT damage numbers). Drift upward,
+// fade out, removed when life expires.
+function updatePopups(dt) {
+  for (let i = state.popups.length - 1; i >= 0; i--) {
+    const p = state.popups[i];
+    p.y += p.vy * dt;
+    p.vy *= 0.92; // ease out so they slow as they rise
+    p.life -= dt;
+    if (p.life <= 0) state.popups.splice(i, 1);
+  }
+}
+
+function drawPopups() {
+  for (const p of state.popups) {
+    const a = Math.max(0, p.life / p.max);
+    ctx.font = `bold 14px Fredoka, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // White stroke behind the text so it stays readable over any background.
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255,255,255,${a * 0.85})`;
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = hexWithAlpha(p.color, a);
+    ctx.fillText(p.text, p.x, p.y);
+  }
+}
+
+// Helper: turn '#1B5E20' into 'rgba(27,94,32,a)'.
+function hexWithAlpha(hex, a) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0,2), 16);
+  const g = parseInt(h.slice(2,4), 16);
+  const b = parseInt(h.slice(4,6), 16);
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 function spawnSparkles(x, y, color, count=6) {
@@ -5761,6 +5814,8 @@ function draw() {
   // the expanding ring effect.
   for (const sr of state.splashRings) drawSplashRing(sr);
   for (const s of state.sparkles) drawSparkle(s);
+  // Popups render last so floating damage numbers sit above sparkles.
+  drawPopups();
 }
 
 function drawGrid() {
@@ -5918,12 +5973,42 @@ function drawEnemy(e) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(e.x, e.y + bob, r + 3, 0, Math.PI * 2); ctx.stroke();
   }
-  // Poison drip marker
+  // Poison effects — pulsing skull, occasional drip, tick flash ring.
   if (e.dotTicksLeft > 0) {
-    ctx.fillStyle = '#2E7D32';
-    ctx.font = `${Math.round(r * 0.7)}px serif`;
+    // Pulse the skull at ~2Hz so the poisoned state is visibly "alive"
+    // even between ticks. dotFlash gives an extra punch right after a
+    // tick lands.
+    const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.12;
+    const flashBoost = (e.dotFlash || 0) > 0 ? 1.35 : 1;
+    const skullSize = r * 0.7 * pulse * flashBoost;
+    ctx.fillStyle = '#1B5E20';
+    ctx.font = `${Math.round(skullSize)}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('☠', e.x + r * 0.7, e.y - r * 0.6 + bob);
+    // Tick flash: green ring expanding outward briefly. Reads as "ouch,
+    // a tick just hit."
+    if ((e.dotFlash || 0) > 0) {
+      const t = 1 - (e.dotFlash / 0.18); // 0 → 1 over the flash window
+      ctx.strokeStyle = `rgba(76,175,80,${0.6 * (1 - t)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y + bob, r + 4 + t * 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Continuous drip droplets. Stochastically spawn one drop most frames
+    // so there's a steady trickle without flooding. Drops are added to
+    // the sparkle system with downward velocity for a "dripping" feel.
+    if (Math.random() < 0.25) {
+      const dropX = e.x + (Math.random() - 0.5) * r * 1.2;
+      const dropY = e.y + bob + r * 0.4;
+      state.sparkles.push({
+        x: dropX, y: dropY,
+        vx: (Math.random() - 0.5) * 10,
+        vy: 30 + Math.random() * 20, // drifts down, gravity in updateSparkles adds more
+        life: 0.5, max: 0.6,
+        color: '#4CAF50', size: 2 + Math.random() * 1.5,
+      });
+    }
   }
   if (e.hp < e.maxHp) {
     const w = r * 2;
@@ -6739,6 +6824,7 @@ function loop(now) {
   }
   updateSparkles(dt);
   updateSplashRings(dt);
+  updatePopups(dt);
   draw();
   requestAnimationFrame(loop);
 }
@@ -6869,7 +6955,7 @@ function startLevel(levelNum, opts = {}) {
   state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
-  state.sparkles = []; state.splashRings = []; state.spawnQueue = [];
+  state.sparkles = []; state.splashRings = []; state.popups = []; state.spawnQueue = [];
   state.gameTime = 0;
   state.running = true;
   state.selectedTowerType = null;
