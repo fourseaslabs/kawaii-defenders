@@ -5600,8 +5600,42 @@ function damageEnemy(enemy, amount, fxColor) {
 
 // Apply a slow effect, taking the strongest overlapping slow so weaker ones
 // don't overwrite a stronger one mid-duration.
+// How much of an ice tower's slow effect actually lands on a boss. Bosses
+// are massive and supposed to feel imposing — full slow makes them trivial
+// once the player has a leveled-up Ice Wizard. 0.15 means a 90% slow on a
+// boss caps at 90% × 0.15 = 13.5%, barely noticeable. Tune this if bosses
+// feel too uncrushable or too unaffected.
+const BOSS_SLOW_RESIST = 0.15;
+const BOSS_SLOW_DURATION_MULT = 0.5;
+
 function applySlow(enemy, amount, durationMs) {
   if (!enemy) return;
+  // Bosses resist most of the slow. Reduce both magnitude and duration.
+  // Done here (in the apply path) rather than at the call site so any future
+  // slow source — splash, AoE, item effects — automatically inherits the
+  // resistance without needing to remember to apply the multiplier.
+  if (enemy.boss) {
+    amount *= BOSS_SLOW_RESIST;
+    durationMs *= BOSS_SLOW_DURATION_MULT;
+    // Spawn a quick burst of ice shards bouncing off the boss as visual
+    // feedback that the slow was resisted. Reads as "the ice shattered on
+    // them" — pairs with the dimmer aura ring in drawEnemy. Particles use
+    // the existing sparkle system with upward/outward velocity so they
+    // look like fragments deflecting rather than settling on the enemy.
+    for (let i = 0; i < 6; i++) {
+      const ang = -Math.PI/2 + (Math.random() - 0.5) * Math.PI; // upward fan
+      const spd = 80 + Math.random() * 60;
+      state.sparkles.push({
+        x: enemy.x + (Math.random() - 0.5) * 12,
+        y: enemy.y - 4,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        life: 0.45 + Math.random() * 0.2, max: 0.6,
+        color: i % 2 === 0 ? '#E0F4FF' : '#81D4FA', // alternating white/cyan shards
+        size: 2.5 + Math.random() * 2,
+      });
+    }
+  }
   const now = state.gameTime || 0;
   const newUntil = now + durationMs / 1000;
   // Keep the stronger slow if one is already active; extend duration.
@@ -5963,14 +5997,22 @@ function drawEnemy(e) {
   const bob = Math.sin(e.wobble) * 2;
   const r = state.tileSize * (e.boss ? 0.42 : 0.28);
   // Tint based on active effects: poison = greenish, slow = icy blue. Poison wins if both.
+  // Bosses get a much subtler slow tint (back to their pink) so the slow
+  // looks like it barely sticks — pairs with the lower BOSS_SLOW_RESIST
+  // value in applySlow.
   let bg = e.boss ? '#FFD6D6' : 'white';
   if (e.dotTicksLeft > 0) bg = '#D0F5C8';
-  else if ((e.slowAmount || 0) > 0) bg = '#D6EFFF';
+  else if ((e.slowAmount || 0) > 0) bg = e.boss ? '#FFE0E5' : '#D6EFFF';
   drawEmojiCircle(e.x, e.y + bob, r, bg, e.type.emoji);
-  // Slow aura ring
+  // Slow aura ring — bosses get a dimmer outline (40% the alpha) so the
+  // ring barely glows. Same color so it's still recognizable as an ice
+  // effect, just visibly resisted.
   if ((e.slowAmount || 0) > 0) {
-    ctx.strokeStyle = `rgba(2,136,209,${0.25 + e.slowAmount * 0.4})`;
-    ctx.lineWidth = 2;
+    const auraAlpha = e.boss
+      ? 0.10 + e.slowAmount * 0.15  // resisted glow: very faint
+      : 0.25 + e.slowAmount * 0.4;  // normal full glow
+    ctx.strokeStyle = `rgba(2,136,209,${auraAlpha})`;
+    ctx.lineWidth = e.boss ? 1.5 : 2;
     ctx.beginPath(); ctx.arc(e.x, e.y + bob, r + 3, 0, Math.PI * 2); ctx.stroke();
   }
   // Poison effects — pulsing skull, occasional drip, tick flash ring.
