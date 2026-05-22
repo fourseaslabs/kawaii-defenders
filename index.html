@@ -4716,6 +4716,32 @@ const TOWER_DEFS = {
     colors:['#D8CCB4','#6D4C41'], ringColor:'#4E342E',
     reward:true,
   },
+  heartsping: {
+    name:'Heartsping', emoji:'💗',
+    costs:[70, 42, 47, 54, 64, 76, 92, 110, 135, 165],
+    range:[2.4, 3.4],   // Medium range — frontline bruiser, not a backline sniper.
+    dmg:[3, 20], fireRate:[700, 340],   // Fastest heavy hitter: ~2x cannon's fire rate,
+                                        // slightly less per-hit damage. Throws heart
+                                        // projectiles single-target.
+    colors:['#FFC1D9','#E91E63'], ringColor:'#AD1457',
+    reward:true,
+  },
+  shashaping: {
+    name:'Shashaping', emoji:'🍦',
+    costs:[65, 40, 44, 50, 60, 72, 86, 104, 126, 155],
+    range:[2.2, 3.3],
+    dmg:[3, 12], fireRate:[850, 480],
+    colors:['#FFF0F5','#80DEEA'], ringColor:'#00838F',
+    // Chain/bounce: each shot hits the primary target then arcs to nearby
+    // enemies. hops = extra targets beyond the first. 2 at L1 (3 enemies
+    // total) → 5 at L10 (6 total). Damage falls 25% per bounce. Also lands
+    // a light chill slow on every enemy it touches (12% → 45%).
+    chain:[2, 5],            // extra hops beyond the primary target
+    chainFalloff:0.25,       // each bounce deals 25% less than the previous
+    chainRange:1.6,          // tiles: how far a bounce can reach to the next enemy
+    slow:[0.12, 0.45],       // light chill on every hit
+    reward:true,
+  },
 };
 
 function buildTowerLevels(def) {
@@ -4745,6 +4771,13 @@ function buildTowerLevels(def) {
       spec.dotPct = +lerpRange(def.dot, t).toFixed(2);   // fraction of max HP per tick
       spec.dotTicks = Math.round(lerpRange(def.dotTicks, t));
       spec.dotInterval = 500; // ms between ticks
+    }
+    if (def.chain) {
+      // Number of extra bounces beyond the primary target. Rounded so the
+      // count steps cleanly: L1 = 2 hops (3 enemies), L10 = 5 hops (6 enemies).
+      spec.chainHops = Math.round(lerpRange(def.chain, t));
+      spec.chainFalloff = def.chainFalloff;   // damage multiplier lost per bounce
+      spec.chainRange = def.chainRange;        // tiles a bounce can travel
     }
     levels.push(spec);
   }
@@ -5088,6 +5121,7 @@ const progress = {
         for (const n of Object.keys(mc)) unionClaimed[n] = mc[n];
         for (const n of Object.keys(cc)) if (!unionClaimed[n]) unionClaimed[n] = cc[n];
         let coins = 0, fire = false, ice = false, poison = false, cannon = false;
+        let heartsping = false, shashaping = false;
         // Note: extraLives is no longer a counter — +10 reward goes directly
         // into livesPool. Old claims of 'extraLives' already contributed when
         // they were made; we don't re-add them here.
@@ -5098,6 +5132,8 @@ const progress = {
           else if (choice === 'ice') ice = true;
           else if (choice === 'poison') poison = true;
           else if (choice === 'cannon') cannon = true;
+          else if (choice === 'heartsping') heartsping = true;
+          else if (choice === 'shashaping') shashaping = true;
         }
         // livesPool: take whichever side has the newer timestamp. If the cloud
         // side has never been migrated (no timestamp), fall back to local.
@@ -5115,6 +5151,7 @@ const progress = {
           extraLivesClaims: 0, // retired — always zero going forward
           extraCoinsClaims,
           fire, ice, poison, cannon,
+          heartsping, shashaping,
           claimed: unionClaimed,
           livesPool: winner.livesPool != null ? winner.livesPool : STARTING_LIVES_POOL,
           livesPoolUpdatedAt: Math.max(mTs, cTs, Date.now()),
@@ -5203,6 +5240,7 @@ const progress = {
         extraLivesClaims: 0,
         extraCoinsClaims: 0,
         fire: false, ice: false, poison: false, cannon: false,
+        heartsping: false, shashaping: false,
         claimed: {},
         livesPool: STARTING_LIVES_POOL,
         livesPoolUpdatedAt: Date.now(),
@@ -5213,6 +5251,8 @@ const progress = {
     if (typeof r.extraLivesClaims !== 'number') r.extraLivesClaims = 0;
     if (typeof r.extraCoinsClaims !== 'number') r.extraCoinsClaims = 0;
     if (typeof r.cannon !== 'boolean') r.cannon = false;
+    if (typeof r.heartsping !== 'boolean') r.heartsping = false;
+    if (typeof r.shashaping !== 'boolean') r.shashaping = false;
     if (!r.claimed) r.claimed = {};
     // Migration: older saves used `extraLivesClaims × 2` applied at level
     // start. Convert to a persistent pool of STARTING_LIVES_POOL + (claims ×
@@ -5252,6 +5292,8 @@ const progress = {
     else if (choice === 'ice') r.ice = true;
     else if (choice === 'poison') r.poison = true;
     else if (choice === 'cannon') r.cannon = true;
+    else if (choice === 'heartsping') r.heartsping = true;
+    else if (choice === 'shashaping') r.shashaping = true;
     await this.save();
     return true;
   },
@@ -5379,6 +5421,7 @@ const state = {
   sparkles: [],
   splashRings: [],   // visual rings shown when splash damage fires
   popups: [],        // floating text (e.g. "-12" when DoT ticks)
+  zaps: [],          // chain-lightning arcs between bounced enemies (Shashaping)
   spawnQueue: [],
   spawnTimer: 0,
   currentWaveIdx: 0,  // index in spec.waves
@@ -5574,8 +5617,13 @@ function updateTowers(dt) {
     if (target) {
       const proj = { x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color };
       if (spec.splash) proj.splash = spec.splash * state.tileSize; // px radius
-      if (spec.slow) { proj.slow = spec.slow; proj.slowDuration = spec.slowDuration; }
+      if (spec.slow) { proj.slow = spec.slow; proj.slowDuration = spec.slowDuration || 1500; }
       if (spec.dotPct) { proj.dotPct = spec.dotPct; proj.dotTicks = spec.dotTicks; proj.dotInterval = spec.dotInterval; }
+      if (spec.chainHops) {
+        proj.chainHops = spec.chainHops;
+        proj.chainFalloff = spec.chainFalloff;
+        proj.chainRange = spec.chainRange * state.tileSize; // px
+      }
       state.projectiles.push(proj);
       t.cooldown = spec.fireRate;
       audio.play('shoot');
@@ -5695,6 +5743,33 @@ function updateProjectiles(dt) {
         if (p.dotPct && p.dotTicks && state.enemies.includes(target)) {
           applyDot(target, p.dotPct, p.dotTicks, p.dotInterval);
         }
+        // Chain/bounce (Shashaping): after the primary hit, the shot arcs to
+        // nearby enemies. Each bounce deals chainFalloff less than the last
+        // and applies the chill slow. We greedily hop to the nearest enemy
+        // not yet hit, within chainRange of the previous hop. (The primary
+        // target's chill is already applied by the generic slow block above.)
+        if (p.chainHops) {
+          const hit = new Set([target]);
+          let prev = target;
+          let hopDmg = p.dmg;
+          for (let h = 0; h < p.chainHops; h++) {
+            // Find nearest un-hit enemy within chainRange of the previous hop.
+            let next = null, nd = Infinity;
+            for (const e of state.enemies) {
+              if (hit.has(e) || e.segment < 1) continue;
+              const d = Math.hypot(e.x - prev.x, e.y - prev.y);
+              if (d <= p.chainRange && d < nd) { nd = d; next = e; }
+            }
+            if (!next) break; // no more enemies in reach — chain ends
+            hopDmg = Math.max(1, Math.round(hopDmg * (1 - p.chainFalloff)));
+            // Draw the arc BEFORE damage, so it still shows even if the hop kills the enemy.
+            state.zaps.push({ x1: prev.x, y1: prev.y, x2: next.x, y2: next.y, life: 0.22, max: 0.22, color: p.color });
+            if (p.slow) applySlow(next, p.slow, p.slowDuration || 1500);
+            damageEnemy(next, hopDmg, p.color);
+            hit.add(next);
+            prev = next;
+          }
+        }
       }
       state.projectiles.splice(i, 1);
     }
@@ -5746,6 +5821,16 @@ function updatePopups(dt) {
     p.vy *= 0.92; // ease out so they slow as they rise
     p.life -= dt;
     if (p.life <= 0) state.popups.splice(i, 1);
+  }
+}
+
+// Chain-lightning arcs (Shashaping bounces). Just a short-lived line between
+// two points that fades out fast.
+function updateZaps(dt) {
+  for (let i = state.zaps.length - 1; i >= 0; i--) {
+    const z = state.zaps[i];
+    z.life -= dt;
+    if (z.life <= 0) state.zaps.splice(i, 1);
   }
 }
 
@@ -5847,9 +5932,32 @@ function draw() {
   // Splash rings render under sparkles so the particle burst sits on top of
   // the expanding ring effect.
   for (const sr of state.splashRings) drawSplashRing(sr);
+  // Chain-lightning arcs under sparkles so the impact sparkles sit on top.
+  drawZaps();
   for (const s of state.sparkles) drawSparkle(s);
   // Popups render last so floating damage numbers sit above sparkles.
   drawPopups();
+}
+
+// Draw the Shashaping chain arcs — a glowing line between bounced enemies
+// with a soft white core, fading out over its short life.
+function drawZaps() {
+  for (const z of state.zaps) {
+    const a = Math.max(0, z.life / z.max);
+    ctx.save();
+    // Outer colored glow
+    ctx.strokeStyle = z.color;
+    ctx.globalAlpha = a * 0.7;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(z.x1, z.y1); ctx.lineTo(z.x2, z.y2); ctx.stroke();
+    // Bright white core
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.globalAlpha = a * 0.9;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(z.x1, z.y1); ctx.lineTo(z.x2, z.y2); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawGrid() {
@@ -6187,6 +6295,7 @@ function openTowerPopup(tower) {
         ${current.splash ? statRow('💥 SPLASH', current.splash, next?.splash, ' tile') : ''}
         ${current.slow != null ? statRow('🐌 SLOW', Math.round(current.slow * 100), next ? Math.round(next.slow * 100) : null, '%') : ''}
         ${current.dotPct ? statRow('☠️ POISON', `${Math.round(current.dotPct * 100)}% × ${current.dotTicks}`, next ? `${Math.round(next.dotPct * 100)}% × ${next.dotTicks}` : null) : ''}
+        ${current.chainHops ? statRow('🍦 CHAIN', `${current.chainHops + 1} hits`, next ? `${next.chainHops + 1} hits` : null) : ''}
       </div>
       <div style="margin-bottom:10px;">
         <div style="font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:#4A3D4C;margin-bottom:4px;">🎯 TARGET</div>
@@ -6301,6 +6410,8 @@ function ownedTowerKeys() {
   if (r.ice) keys.push('ice');
   if (r.poison) keys.push('poison');
   if (r.cannon) keys.push('cannon');
+  if (r.heartsping) keys.push('heartsping');
+  if (r.shashaping) keys.push('shashaping');
   return keys;
 }
 
@@ -6867,6 +6978,7 @@ function loop(now) {
   updateSparkles(dt);
   updateSplashRings(dt);
   updatePopups(dt);
+  updateZaps(dt);
   draw();
   requestAnimationFrame(loop);
 }
@@ -6997,7 +7109,7 @@ function startLevel(levelNum, opts = {}) {
   state.coins = state.spec.startCoins + (rewards.extraCoinsClaims || 0) * 30;
   state.currentWaveIdx = 0;
   state.enemies = []; state.towers = []; state.projectiles = [];
-  state.sparkles = []; state.splashRings = []; state.popups = []; state.spawnQueue = [];
+  state.sparkles = []; state.splashRings = []; state.popups = []; state.zaps = []; state.spawnQueue = [];
   state.gameTime = 0;
   state.running = true;
   state.selectedTowerType = null;
@@ -7247,6 +7359,18 @@ function showBossRewardPicker(isRefight, onDone) {
       desc: 'Ultra long range — fires up to 6 squares away. Slow to reload.',
       available: !isRefight && !r.cannon,
       ownedNote: r.cannon ? 'Already unlocked' : '',
+    },
+    {
+      key: 'heartsping', emoji: '💗', name: 'Heartsping Tower',
+      desc: 'Royal Teenieping of Love — fast-firing heart shots, heavy single-target damage.',
+      available: !isRefight && !r.heartsping,
+      ownedNote: r.heartsping ? 'Already unlocked' : '',
+    },
+    {
+      key: 'shashaping', emoji: '🍦', name: 'Shashaping Tower',
+      desc: 'Ice-cream chain shots that bounce between monsters and chill each one.',
+      available: !isRefight && !r.shashaping,
+      ownedNote: r.shashaping ? 'Already unlocked' : '',
     },
     {
       key: 'extraCoins', emoji: '💰', name: '+30 Starting Coins',
@@ -8306,6 +8430,10 @@ function renderAdminEdit(username, email) {
           <label><input type="checkbox" data-edit-key="poison" data-track="${rKey}" ${r.poison?'checked':''}> Poison tower</label>
           <label><input type="checkbox" data-edit-key="cannon" data-track="${rKey}" ${r.cannon?'checked':''}> Cannon tower</label>
         </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="heartsping" data-track="${rKey}" ${r.heartsping?'checked':''}> Heartsping tower</label>
+          <label><input type="checkbox" data-edit-key="shashaping" data-track="${rKey}" ${r.shashaping?'checked':''}> Shashaping tower</label>
+        </div>
       </div>
     `;
   }).join('');
@@ -8342,6 +8470,7 @@ async function doAdminSave() {
           data[trackKey] = {
             extraLivesClaims: 0, extraCoinsClaims: 0,
             fire: false, ice: false, poison: false, cannon: false,
+            heartsping: false, shashaping: false,
             claimed: {}, livesPool: STARTING_LIVES_POOL, livesPoolUpdatedAt: Date.now(),
           };
         } else {
