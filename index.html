@@ -299,7 +299,18 @@ body::before {
   text-align:center; color:var(--ink); text-shadow:3px 3px 0 var(--sun); margin-bottom:6px; }
 .reward-sub { font-family:'Fredoka',sans-serif; font-size:13px; color:#7A6A7C;
   text-align:center; margin-bottom:14px; }
-.reward-options { display:flex; flex-direction:column; gap:10px; width:100%; max-width:340px; }
+/* Reward options list. With many reward towers unlocked the list can be
+   longer than the viewport, so we cap height and let it scroll. The mask
+   image fades the top and bottom edges so it visually reads as "more
+   below" without needing a scrollbar arrow. */
+.reward-options { display:flex; flex-direction:column; gap:10px; width:100%; max-width:340px;
+  max-height:60vh; overflow-y:auto; padding:4px 6px 4px 2px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 14px, black calc(100% - 14px), transparent 100%); }
+/* Smaller scroll-bar styling so it doesn't fight the kawaii aesthetic. */
+.reward-options::-webkit-scrollbar { width:6px; }
+.reward-options::-webkit-scrollbar-thumb { background:rgba(61,46,63,0.35); border-radius:3px; }
+.reward-options::-webkit-scrollbar-track { background:transparent; }
 .reward-btn { background:white; border:3px solid var(--ink); border-radius:16px;
   padding:12px 14px; cursor:pointer; box-shadow:0 4px 0 var(--ink);
   font-family:'Nunito',sans-serif; display:flex; align-items:center; gap:12px;
@@ -4742,6 +4753,77 @@ const TOWER_DEFS = {
     slow:[0.12, 0.45],       // light chill on every hit
     reward:true,
   },
+  diaping: {
+    name:'Diaping', emoji:'😡',
+    costs:[85, 50, 55, 62, 72, 86, 102, 120, 145, 175],
+    range:[3.0, 4.0],
+    // Charge-up artillery. Doesn't fire normally — builds rage while enemies
+    // are in range (1 charge/sec at L1, 1.6/sec at L10), and releases a
+    // single massive AOE burst when full. Huge per-burst damage. Distinct
+    // from Fire (continuous splash) and Cannon (single-target sniper).
+    dmg:[18, 70], fireRate:[3000, 1700],  // fireRate here = charge time in ms
+    splash:[1.4, 2.6],                     // tiles: burst radius at release
+    colors:['#FFCCBC','#FF5722'], ringColor:'#BF360C',
+    charge:true,                            // flag: drawTower + updateTowers handle it
+    reward:true,
+  },
+  joyping: {
+    name:'Joyping', emoji:'😊',
+    costs:[40, 25, 28, 32, 38, 45, 55, 68, 84, 105],
+    range:[1.5, 1.5],                       // aura radius, not attack range
+    dmg:[0, 0], fireRate:[1000, 1000],      // doesn't attack
+    colors:['#FFF59D','#FBC02D'], ringColor:'#F57F17',
+    // Buff aura: boosts fire rate of adjacent towers (within range) by
+    // +15% L1 to +40% L10. Stacks multiplicatively if multiple joypings
+    // overlap a tower (cap enforced in applyJoyBuff).
+    buff:[0.15, 0.40],                      // fire rate boost fraction
+    support:true,                            // flag: no attack, no projectiles
+    reward:true,
+  },
+  sleeping: {
+    name:'Sleeping', emoji:'😴',
+    costs:[60, 38, 42, 48, 56, 66, 78, 94, 115, 140],
+    range:[2.6, 3.6],
+    dmg:[2, 8], fireRate:[600, 380],
+    colors:['#D1C4E9','#7E57C2'], ringColor:'#4527A0',
+    // Stun-on-hit chance. Brief freeze (~0.6s) interrupts boss movement —
+    // the ONLY tower that meaningfully halts a boss after the slow-resist
+    // change. Damage is low; this is a support/control tower.
+    stunChance:[0.10, 0.35],                // probability of stun per hit
+    stunDuration:600,                        // ms frozen
+    reward:true,
+  },
+  sparkling: {
+    name:'Sparkling', emoji:'⚡',
+    costs:[70, 42, 47, 54, 64, 76, 92, 110, 135, 165],
+    range:[3.5, 4.5],
+    dmg:[5, 18], fireRate:[800, 500],
+    colors:['#FFF9C4','#FFD600'], ringColor:'#F57F17',
+    // Pierce-line: fires a straight beam from the tower through the target,
+    // hitting every enemy along the line. Damage falls off 15% per enemy
+    // pierced (so the 5th enemy still takes ~50% damage). Distinct from
+    // Shashaping's nearest-neighbor chain — this rewards straight path
+    // segments, weak on curves.
+    pierce:true,
+    pierceFalloff:0.15,                      // damage drop per enemy pierced
+    pierceWidth:0.35,                        // tile widths: how close to the line counts as hit
+    reward:true,
+  },
+  lullaping: {
+    name:'Lullaping', emoji:'🌙',
+    costs:[65, 40, 44, 50, 60, 72, 86, 104, 126, 155],
+    range:[2.8, 3.8],
+    dmg:[2, 6], fireRate:[900, 550],
+    colors:['#B3E5FC','#5C6BC0'], ringColor:'#283593',
+    // Vulnerability mark: every hit makes the target take +25% (L1) to
+    // +60% (L10) damage from ALL sources for 2 seconds. Forces a support
+    // playstyle — pairs with Heartsping/Cannon as a damage amplifier.
+    // Low base damage; the value is in the multiplier on other towers.
+    mark:[0.25, 0.60],
+    markDuration:2000,                       // ms the mark lingers
+    colors2:['#E1BEE7','#7E57C2'],          // moon-glow gradient
+    reward:true,
+  },
 };
 
 function buildTowerLevels(def) {
@@ -4778,6 +4860,33 @@ function buildTowerLevels(def) {
       spec.chainHops = Math.round(lerpRange(def.chain, t));
       spec.chainFalloff = def.chainFalloff;   // damage multiplier lost per bounce
       spec.chainRange = def.chainRange;        // tiles a bounce can travel
+    }
+    // Diaping rage/charge artillery.
+    if (def.charge) {
+      spec.charge = true;
+      // fireRate in this def repurposed as charge time (ms to fully charge).
+      // splash also already set above. Damage is the burst damage.
+    }
+    // Joyping support aura.
+    if (def.support) {
+      spec.support = true;
+      spec.buff = +lerpRange(def.buff, t).toFixed(2);
+    }
+    // Sleeping stun-on-hit.
+    if (def.stunChance) {
+      spec.stunChance = +lerpRange(def.stunChance, t).toFixed(2);
+      spec.stunDuration = def.stunDuration;
+    }
+    // Sparkling pierce-line.
+    if (def.pierce) {
+      spec.pierce = true;
+      spec.pierceFalloff = def.pierceFalloff;
+      spec.pierceWidth = def.pierceWidth;
+    }
+    // Lullaping vulnerability mark.
+    if (def.mark) {
+      spec.mark = +lerpRange(def.mark, t).toFixed(2);
+      spec.markDuration = def.markDuration;
     }
     levels.push(spec);
   }
@@ -5122,6 +5231,7 @@ const progress = {
         for (const n of Object.keys(cc)) if (!unionClaimed[n]) unionClaimed[n] = cc[n];
         let coins = 0, fire = false, ice = false, poison = false, cannon = false;
         let heartsping = false, shashaping = false;
+        let diaping = false, joyping = false, sleeping = false, sparkling = false, lullaping = false;
         // Note: extraLives is no longer a counter — +10 reward goes directly
         // into livesPool. Old claims of 'extraLives' already contributed when
         // they were made; we don't re-add them here.
@@ -5134,6 +5244,11 @@ const progress = {
           else if (choice === 'cannon') cannon = true;
           else if (choice === 'heartsping') heartsping = true;
           else if (choice === 'shashaping') shashaping = true;
+          else if (choice === 'diaping') diaping = true;
+          else if (choice === 'joyping') joyping = true;
+          else if (choice === 'sleeping') sleeping = true;
+          else if (choice === 'sparkling') sparkling = true;
+          else if (choice === 'lullaping') lullaping = true;
         }
         // livesPool: take whichever side has the newer timestamp. If the cloud
         // side has never been migrated (no timestamp), fall back to local.
@@ -5152,6 +5267,7 @@ const progress = {
           extraCoinsClaims,
           fire, ice, poison, cannon,
           heartsping, shashaping,
+          diaping, joyping, sleeping, sparkling, lullaping,
           claimed: unionClaimed,
           livesPool: winner.livesPool != null ? winner.livesPool : STARTING_LIVES_POOL,
           livesPoolUpdatedAt: Math.max(mTs, cTs, Date.now()),
@@ -5241,6 +5357,7 @@ const progress = {
         extraCoinsClaims: 0,
         fire: false, ice: false, poison: false, cannon: false,
         heartsping: false, shashaping: false,
+        diaping: false, joyping: false, sleeping: false, sparkling: false, lullaping: false,
         claimed: {},
         livesPool: STARTING_LIVES_POOL,
         livesPoolUpdatedAt: Date.now(),
@@ -5253,6 +5370,11 @@ const progress = {
     if (typeof r.cannon !== 'boolean') r.cannon = false;
     if (typeof r.heartsping !== 'boolean') r.heartsping = false;
     if (typeof r.shashaping !== 'boolean') r.shashaping = false;
+    if (typeof r.diaping !== 'boolean') r.diaping = false;
+    if (typeof r.joyping !== 'boolean') r.joyping = false;
+    if (typeof r.sleeping !== 'boolean') r.sleeping = false;
+    if (typeof r.sparkling !== 'boolean') r.sparkling = false;
+    if (typeof r.lullaping !== 'boolean') r.lullaping = false;
     if (!r.claimed) r.claimed = {};
     // Migration: older saves used `extraLivesClaims × 2` applied at level
     // start. Convert to a persistent pool of STARTING_LIVES_POOL + (claims ×
@@ -5294,6 +5416,11 @@ const progress = {
     else if (choice === 'cannon') r.cannon = true;
     else if (choice === 'heartsping') r.heartsping = true;
     else if (choice === 'shashaping') r.shashaping = true;
+    else if (choice === 'diaping') r.diaping = true;
+    else if (choice === 'joyping') r.joyping = true;
+    else if (choice === 'sleeping') r.sleeping = true;
+    else if (choice === 'sparkling') r.sparkling = true;
+    else if (choice === 'lullaping') r.lullaping = true;
     await this.save();
     return true;
   },
@@ -5558,6 +5685,12 @@ function updateEnemies(dt) {
     if (e.slowUntil && now >= e.slowUntil) {
       e.slowAmount = 0; e.slowUntil = 0;
     }
+    // Expire stun and vulnerability mark.
+    if (e.stunUntil && now >= e.stunUntil) e.stunUntil = 0;
+    if (e.markUntil && now >= e.markUntil) { e.markAmount = 0; e.markUntil = 0; }
+    // Stunned enemies skip movement entirely (but still take DOT ticks and
+    // remain valid targets — they just don't progress).
+    const isStunned = e.stunUntil && now < e.stunUntil;
     const a = pp[e.segment];
     const b = pp[e.segment + 1];
     if (!b) {
@@ -5572,6 +5705,7 @@ function updateEnemies(dt) {
       if (state.lives <= 0) { gameOver(false); return; }
       continue;
     }
+    if (isStunned) continue; // frozen — no progress this frame
     const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const effectiveSpeed = e.speed * (1 - (e.slowAmount || 0));
     e.t += (effectiveSpeed * dt) / segLen;
@@ -5594,18 +5728,29 @@ function placeTower(col, row, type) {
 function updateTowers(dt) {
   for (const t of state.towers) {
     const spec = towerSpec(t.type, t.level);
-    t.cooldown -= dt * 1000;
+    // Joyping support towers don't attack — they just sit there providing
+    // an aura buff to neighboring towers. Skip the firing logic entirely.
+    // (Their visual pulse is handled in drawTower.)
+    if (spec.support) continue;
+    // Diaping rage/charge artillery — accumulates charge while enemies are
+    // in range, releases a big AOE burst when full.
+    if (spec.charge) {
+      updateChargeTower(t, spec, dt);
+      continue;
+    }
+    // Joyping fire-rate buff: each adjacent joyping multiplies the effective
+    // fire rate. Capped at 2.5x total so a player can't stack four joypings
+    // for a permanent machine-gun. The buff goes on cooldown reduction:
+    // smaller cooldown = faster fire.
+    const fireRateMult = getJoyMultiplier(t);
+    t.cooldown -= dt * 1000 * fireRateMult;
     if (t.cooldown > 0) continue;
     const rangePx = spec.range * state.tileSize;
-    // Pick a target based on the tower's targetMode.
-    //   'first' (default) — enemy with the most path progress (closest to goal)
-    //   'last'            — enemy with the least path progress (closest to spawn)
-    // Path progress = segment + t for each enemy.
     const mode = t.targetMode || 'first';
     let target = null;
     let bestProgress = mode === 'first' ? -Infinity : Infinity;
     for (const e of state.enemies) {
-      if (e.segment < 1) continue; // Still off-screen — invulnerable until visible
+      if (e.segment < 1) continue;
       const d = Math.hypot(e.x - t.x, e.y - t.y);
       if (d >= rangePx) continue;
       const progress = (e.segment || 0) + (e.t || 0);
@@ -5616,13 +5761,33 @@ function updateTowers(dt) {
     }
     if (target) {
       const proj = { x: t.x, y: t.y, target, dmg: spec.dmg, t: 0, color: spec.color };
-      if (spec.splash) proj.splash = spec.splash * state.tileSize; // px radius
+      if (spec.splash) proj.splash = spec.splash * state.tileSize;
       if (spec.slow) { proj.slow = spec.slow; proj.slowDuration = spec.slowDuration || 1500; }
       if (spec.dotPct) { proj.dotPct = spec.dotPct; proj.dotTicks = spec.dotTicks; proj.dotInterval = spec.dotInterval; }
       if (spec.chainHops) {
         proj.chainHops = spec.chainHops;
         proj.chainFalloff = spec.chainFalloff;
-        proj.chainRange = spec.chainRange * state.tileSize; // px
+        proj.chainRange = spec.chainRange * state.tileSize;
+      }
+      // Sleeping: stun chance + duration ride along on the projectile so the
+      // hit handler can roll the dice when the shot lands.
+      if (spec.stunChance) {
+        proj.stunChance = spec.stunChance;
+        proj.stunDuration = spec.stunDuration;
+      }
+      // Sparkling: pierce-line shots travel from tower to target and beyond,
+      // hitting everything along the way. Pre-compute the line direction so
+      // updateProjectiles can resolve the line on impact.
+      if (spec.pierce) {
+        proj.pierce = true;
+        proj.pierceFalloff = spec.pierceFalloff;
+        proj.pierceWidth = spec.pierceWidth * state.tileSize;
+        proj.lineOriginX = t.x; proj.lineOriginY = t.y;
+      }
+      // Lullaping: vulnerability mark applied on hit.
+      if (spec.mark) {
+        proj.mark = spec.mark;
+        proj.markDuration = spec.markDuration;
       }
       state.projectiles.push(proj);
       t.cooldown = spec.fireRate;
@@ -5631,9 +5796,91 @@ function updateTowers(dt) {
   }
 }
 
+// Diaping rage/charge artillery: builds charge while any enemy is in range,
+// fires a single big AOE burst when full. Charge accumulates at a per-spec
+// rate; the rate is 1000/spec.fireRate per second (so a fireRate of 3000ms
+// means full charge in 3 seconds). Charge resets to 0 after firing.
+function updateChargeTower(t, spec, dt) {
+  if (t.charge == null) t.charge = 0;
+  const rangePx = spec.range * state.tileSize;
+  let hasTargetInRange = false;
+  for (const e of state.enemies) {
+    if (e.segment < 1) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d < rangePx) { hasTargetInRange = true; break; }
+  }
+  if (hasTargetInRange) {
+    // Charge up. Joy aura also speeds the charge (buff is the same fire-rate
+    // multiplier used elsewhere — higher = faster, so we multiply the
+    // numerator).
+    const buff = getJoyMultiplier(t);
+    t.charge += (dt * 1000 * buff) / spec.fireRate;
+    if (t.charge >= 1) {
+      // Release: AOE burst centered on the strongest cluster of enemies in
+      // range. Simple approach: pick the enemy with the most neighbors
+      // within splash radius — maximizes damage delivered. Falls back to
+      // any in-range enemy if no cluster found.
+      const splashPx = spec.splash * state.tileSize;
+      let bestEnemy = null, bestCount = -1;
+      const inRange = state.enemies.filter(e => e.segment >= 1
+        && Math.hypot(e.x - t.x, e.y - t.y) < rangePx);
+      for (const e of inRange) {
+        let count = 0;
+        for (const other of inRange) {
+          if (Math.hypot(other.x - e.x, other.y - e.y) < splashPx) count++;
+        }
+        if (count > bestCount) { bestCount = count; bestEnemy = e; }
+      }
+      if (bestEnemy) {
+        const proj = {
+          x: t.x, y: t.y, target: bestEnemy, dmg: spec.dmg, t: 0,
+          color: spec.color, splash: splashPx, burst: true,
+        };
+        state.projectiles.push(proj);
+        audio.play('shoot');
+        t.charge = 0;
+      }
+    }
+  } else {
+    // No targets — bleed charge slowly so it doesn't sit full forever
+    // looking ready (this gives a visual "calming down" effect).
+    t.charge = Math.max(0, t.charge - dt * 0.15);
+  }
+}
+
+// Joyping aura: multiplier applied to a tower's fire rate. Walks all
+// joypings, checks distance to each, multiplies cumulative buff. Returns
+// a cooldown MULTIPLIER (less than 1 = faster fire), so calling code
+// just multiplies the cooldown decrement.
+function getJoyMultiplier(t) {
+  let totalBuff = 0;
+  for (const other of state.towers) {
+    if (other === t) continue;
+    const otherSpec = towerSpec(other.type, other.level);
+    if (!otherSpec.support || !otherSpec.buff) continue;
+    const d = Math.hypot(other.x - t.x, other.y - t.y);
+    const auraPx = otherSpec.range * state.tileSize;
+    if (d <= auraPx) totalBuff += otherSpec.buff;
+  }
+  // Cap at +150% (2.5x total speed) so you can't infinitely stack joypings.
+  totalBuff = Math.min(totalBuff, 1.5);
+  // Cooldown decrement multiplier: more buff → faster fire → larger
+  // multiplier on the dt subtraction. 1 + buff means at 40% buff cooldown
+  // drains 40% faster.
+  return 1 + totalBuff;
+}
+
 // Apply direct damage to an enemy, handling death cleanly. Returns true if killed.
 function damageEnemy(enemy, amount, fxColor) {
   if (!enemy || !state.enemies.includes(enemy)) return false;
+  // Lullaping mark: if active, all incoming damage is multiplied. We don't
+  // consume the mark on hit — it ticks down by duration, so multiple shots
+  // can land while it's still up. That's the entire value of the tower
+  // (other towers do the damage; lullaping just amplifies).
+  const now = state.gameTime || 0;
+  if (enemy.markAmount && enemy.markUntil && enemy.markUntil > now) {
+    amount = amount * (1 + enemy.markAmount);
+  }
   enemy.hp -= amount;
   if (fxColor) spawnSparkles(enemy.x, enemy.y, fxColor, 4);
   if (enemy.hp <= 0) {
@@ -5701,6 +5948,32 @@ function applyDot(enemy, pct, ticks, intervalMs) {
   enemy.dotMaxHp = enemy.maxHp; // lock damage amount to max HP at time of application
 }
 
+// Lullaping vulnerability mark: target takes (1+mark)x damage from ALL
+// sources until markUntil. Strongest mark wins (so a Lullaping upgrade
+// mid-mark doesn't downgrade the effect).
+function applyMark(enemy, mark, durationMs) {
+  if (!enemy) return;
+  const now = state.gameTime || 0;
+  const newUntil = now + durationMs / 1000;
+  if (!enemy.markAmount || mark > enemy.markAmount) enemy.markAmount = mark;
+  if (!enemy.markUntil || newUntil > enemy.markUntil) enemy.markUntil = newUntil;
+}
+
+// Sleeping stun: enemy stops moving for durationMs. Stuns don't stack; if
+// already stunned, take the longer remaining time. Bosses are NOT immune
+// (this is the only tower that can halt a boss after slow-resist).
+function applyStun(enemy, durationMs) {
+  if (!enemy) return;
+  const now = state.gameTime || 0;
+  const newUntil = now + durationMs / 1000;
+  if (!enemy.stunUntil || newUntil > enemy.stunUntil) enemy.stunUntil = newUntil;
+  // Visual indicator: brief 'Z' particle floats up.
+  state.popups.push({
+    x: enemy.x, y: enemy.y - 12, vy: -25, life: 0.6, max: 0.6,
+    text: '💤', color: '#7E57C2',
+  });
+}
+
 // ============== PROJECTILES ==============
 function updateProjectiles(dt) {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
@@ -5710,70 +5983,135 @@ function updateProjectiles(dt) {
       const target = p.target;
       const targetAlive = target && state.enemies.includes(target);
       if (targetAlive) {
-        // Direct hit on the tracked target
-        const killed = damageEnemy(target, p.dmg, p.color);
-        if (!killed) audio.play('hit');
-        // Splash: damage all enemies within radius around the impact point.
-        if (p.splash) {
-          const ix = target.x, iy = target.y;
-          // Visible splash ring at impact so the player can SEE the AoE.
-          // Without this, players don't realize splash is firing.
-          spawnSplashRing(ix, iy, p.splash, p.color);
-          // Splash damage is typically reduced vs. direct hit — use 60% for secondary targets.
-          const splashDmg = Math.max(1, Math.round(p.dmg * 0.6));
-          for (const e of state.enemies.slice()) {
-            if (e === target) continue;
-            const d = Math.hypot(e.x - ix, e.y - iy);
-            if (d <= p.splash) damageEnemy(e, splashDmg, p.color);
+        // Sparkling pierce-line: completely different damage model — instead
+        // of hitting just the target, the beam passes through every enemy
+        // along the line from tower to target (and continues past). We
+        // resolve it as a special case and skip the rest of the normal hit
+        // logic, since damage was applied to multiple enemies at once.
+        if (p.pierce) {
+          resolvePierceLine(p);
+        } else {
+          // Direct hit on the tracked target. Mark is applied BEFORE damage
+          // so the multiplier affects this hit too (otherwise the player
+          // would have to fire a separate shot just to set up — feels bad).
+          if (p.mark) applyMark(target, p.mark, p.markDuration);
+          // Stun: roll dice on hit. Applied before damage so visuals stack.
+          if (p.stunChance && Math.random() < p.stunChance) {
+            applyStun(target, p.stunDuration);
           }
-        }
-        // Slow effect: apply to primary target and all splash targets.
-        if (p.slow && p.slowDuration) {
-          applySlow(target, p.slow, p.slowDuration);
+          const killed = damageEnemy(target, p.dmg, p.color);
+          if (!killed) audio.play('hit');
+          // Splash: damage all enemies within radius around the impact point.
           if (p.splash) {
             const ix = target.x, iy = target.y;
-            for (const e of state.enemies) {
+            spawnSplashRing(ix, iy, p.splash, p.color);
+            // Burst (Diaping) does full damage in splash radius — it's
+            // SUPPOSED to delete clusters. Other splash sources use 60%.
+            const splashMult = p.burst ? 1.0 : 0.6;
+            const splashDmg = Math.max(1, Math.round(p.dmg * splashMult));
+            for (const e of state.enemies.slice()) {
               if (e === target) continue;
               const d = Math.hypot(e.x - ix, e.y - iy);
-              if (d <= p.splash) applySlow(e, p.slow, p.slowDuration);
+              if (d <= p.splash) damageEnemy(e, splashDmg, p.color);
             }
           }
-        }
-        // DOT: applied to the primary target only (poison tower is single-target).
-        if (p.dotPct && p.dotTicks && state.enemies.includes(target)) {
-          applyDot(target, p.dotPct, p.dotTicks, p.dotInterval);
-        }
-        // Chain/bounce (Shashaping): after the primary hit, the shot arcs to
-        // nearby enemies. Each bounce deals chainFalloff less than the last
-        // and applies the chill slow. We greedily hop to the nearest enemy
-        // not yet hit, within chainRange of the previous hop. (The primary
-        // target's chill is already applied by the generic slow block above.)
-        if (p.chainHops) {
-          const hit = new Set([target]);
-          let prev = target;
-          let hopDmg = p.dmg;
-          for (let h = 0; h < p.chainHops; h++) {
-            // Find nearest un-hit enemy within chainRange of the previous hop.
-            let next = null, nd = Infinity;
-            for (const e of state.enemies) {
-              if (hit.has(e) || e.segment < 1) continue;
-              const d = Math.hypot(e.x - prev.x, e.y - prev.y);
-              if (d <= p.chainRange && d < nd) { nd = d; next = e; }
+          // Slow effect: apply to primary target and all splash targets.
+          if (p.slow && p.slowDuration) {
+            applySlow(target, p.slow, p.slowDuration);
+            if (p.splash) {
+              const ix = target.x, iy = target.y;
+              for (const e of state.enemies) {
+                if (e === target) continue;
+                const d = Math.hypot(e.x - ix, e.y - iy);
+                if (d <= p.splash) applySlow(e, p.slow, p.slowDuration);
+              }
             }
-            if (!next) break; // no more enemies in reach — chain ends
-            hopDmg = Math.max(1, Math.round(hopDmg * (1 - p.chainFalloff)));
-            // Draw the arc BEFORE damage, so it still shows even if the hop kills the enemy.
-            state.zaps.push({ x1: prev.x, y1: prev.y, x2: next.x, y2: next.y, life: 0.22, max: 0.22, color: p.color });
-            if (p.slow) applySlow(next, p.slow, p.slowDuration || 1500);
-            damageEnemy(next, hopDmg, p.color);
-            hit.add(next);
-            prev = next;
+          }
+          // DOT: applied to the primary target only (poison tower is single-target).
+          if (p.dotPct && p.dotTicks && state.enemies.includes(target)) {
+            applyDot(target, p.dotPct, p.dotTicks, p.dotInterval);
+          }
+          // Chain/bounce (Shashaping): after the primary hit, the shot arcs to
+          // nearby enemies. Each bounce deals chainFalloff less than the last
+          // and applies the chill slow. We greedily hop to the nearest enemy
+          // not yet hit, within chainRange of the previous hop. (The primary
+          // target's chill is already applied by the generic slow block above.)
+          if (p.chainHops) {
+            const hit = new Set([target]);
+            let prev = target;
+            let hopDmg = p.dmg;
+            for (let h = 0; h < p.chainHops; h++) {
+              let next = null, nd = Infinity;
+              for (const e of state.enemies) {
+                if (hit.has(e) || e.segment < 1) continue;
+                const d = Math.hypot(e.x - prev.x, e.y - prev.y);
+                if (d <= p.chainRange && d < nd) { nd = d; next = e; }
+              }
+              if (!next) break;
+              hopDmg = Math.max(1, Math.round(hopDmg * (1 - p.chainFalloff)));
+              state.zaps.push({ x1: prev.x, y1: prev.y, x2: next.x, y2: next.y, life: 0.22, max: 0.22, color: p.color });
+              if (p.slow) applySlow(next, p.slow, p.slowDuration || 1500);
+              damageEnemy(next, hopDmg, p.color);
+              hit.add(next);
+              prev = next;
+            }
           }
         }
       }
       state.projectiles.splice(i, 1);
     }
   }
+}
+
+// Sparkling pierce-line resolution. Computes the line from the tower to the
+// target, then damages every enemy whose perpendicular distance to that line
+// is under pierceWidth. Enemies are processed in order of distance from the
+// tower so the falloff feels right (closer = full damage, farther = less).
+// Also draws a visible beam via the zaps system.
+function resolvePierceLine(p) {
+  const ox = p.lineOriginX, oy = p.lineOriginY;
+  const tx = p.target.x, ty = p.target.y;
+  // Direction unit vector from origin through target.
+  const dx = tx - ox, dy = ty - oy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  // Beam extends past the target — find the farthest enemy in the half-plane
+  // (positive direction along the line) within pierceWidth. We extend to the
+  // canvas edge for the visual.
+  const farEnd = {
+    x: ox + ux * (state.canvasW + state.canvasH),
+    y: oy + uy * (state.canvasW + state.canvasH),
+  };
+  state.zaps.push({
+    x1: ox, y1: oy, x2: farEnd.x, y2: farEnd.y,
+    life: 0.18, max: 0.18, color: p.color, wide: true,
+  });
+  // Gather all enemies within pierceWidth of the line and in the positive
+  // direction (otherwise the beam would hit enemies BEHIND the tower).
+  const candidates = [];
+  for (const e of state.enemies) {
+    if (e.segment < 1) continue;
+    // Vector from origin to enemy.
+    const ex = e.x - ox, ey = e.y - oy;
+    // Project onto line direction. Negative = behind tower.
+    const along = ex * ux + ey * uy;
+    if (along < 0) continue;
+    // Perpendicular distance from line.
+    const perpX = ex - along * ux;
+    const perpY = ey - along * uy;
+    const perpDist = Math.hypot(perpX, perpY);
+    if (perpDist > p.pierceWidth) continue;
+    candidates.push({ e, along });
+  }
+  // Sort by distance from tower so falloff applies in the right order.
+  candidates.sort((a, b) => a.along - b.along);
+  let dmg = p.dmg;
+  for (const c of candidates) {
+    if (p.mark) applyMark(c.e, p.mark, p.markDuration);  // (defensive — pierce doesn't currently mark, but keep safe)
+    damageEnemy(c.e, Math.max(1, Math.round(dmg)), p.color);
+    dmg *= (1 - p.pierceFalloff);
+  }
+  audio.play('hit');
 }
 
 // ============== DAMAGE-OVER-TIME (poison) ==============
@@ -5940,21 +6278,21 @@ function draw() {
 }
 
 // Draw the Shashaping chain arcs — a glowing line between bounced enemies
-// with a soft white core, fading out over its short life.
+// with a soft white core, fading out over its short life. Sparkling beams
+// (z.wide=true) use thicker lines and longer fade.
 function drawZaps() {
   for (const z of state.zaps) {
     const a = Math.max(0, z.life / z.max);
     ctx.save();
-    // Outer colored glow
+    const isWide = !!z.wide;
     ctx.strokeStyle = z.color;
-    ctx.globalAlpha = a * 0.7;
-    ctx.lineWidth = 4;
+    ctx.globalAlpha = a * (isWide ? 0.5 : 0.7);
+    ctx.lineWidth = isWide ? 8 : 4;
     ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(z.x1, z.y1); ctx.lineTo(z.x2, z.y2); ctx.stroke();
-    // Bright white core
     ctx.strokeStyle = '#FFFFFF';
     ctx.globalAlpha = a * 0.9;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = isWide ? 3 : 1.5;
     ctx.beginPath(); ctx.moveTo(z.x1, z.y1); ctx.lineTo(z.x2, z.y2); ctx.stroke();
     ctx.restore();
   }
@@ -6079,12 +6417,59 @@ function drawTower(t) {
     ctx.strokeStyle = 'rgba(61,46,63,0.14)'; ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
   }
+  // Joyping aura — soft gold glow showing the buff range. Pulses gently so
+  // it's clearly an active effect. Only visible during waves (in prep,
+  // the standard range ring already shows the area).
+  if (spec.support && state.phase === 'wave') {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.004);
+    const auraR = spec.range * state.tileSize;
+    ctx.fillStyle = `rgba(255,213,79,${0.06 + pulse * 0.04})`;
+    ctx.beginPath(); ctx.arc(t.x, t.y, auraR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(245,127,23,${0.3 + pulse * 0.2})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(t.x, t.y, auraR, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
   // Upgrade ring (visible from L4+, gold from L8+)
   if (spec.ring) {
     ctx.beginPath(); ctx.arc(t.x, t.y, r + 3, 0, Math.PI * 2);
     ctx.strokeStyle = spec.ring; ctx.lineWidth = 3; ctx.stroke();
   }
+  // Joy-buffed indicator: small gold sparkle on the upper corner of any
+  // tower currently sitting in a joyping aura. So players can see "this
+  // tower is being boosted right now."
+  if (!spec.support && state.phase === 'wave') {
+    const mult = getJoyMultiplier(t);
+    if (mult > 1.01) {  // anything above noise
+      ctx.font = `${Math.round(r * 0.55)}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✨', t.x + r * 0.85, t.y - r * 0.85);
+    }
+  }
   drawEmojiCircle(t.x, t.y, r, spec.color, spec.emoji);
+  // Diaping charge bar: fills an arc around the tower as charge builds,
+  // flashing white when full and about to release. Clearer feedback than
+  // a number, and players can position themselves emotionally for the
+  // boom.
+  if (spec.charge && t.charge != null && t.charge > 0) {
+    const charge = Math.min(1, t.charge);
+    const startAng = -Math.PI / 2;
+    const endAng = startAng + charge * Math.PI * 2;
+    ctx.strokeStyle = charge >= 1 ? '#FFFFFF' : '#FF5722';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r + 6, startAng, endAng);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    if (charge >= 0.95) {
+      // About to fire — wobble + glow
+      const glow = 0.5 + 0.5 * Math.sin(performance.now() * 0.03);
+      ctx.fillStyle = `rgba(255,87,34,${0.2 + glow * 0.3})`;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r + 10, 0, Math.PI * 2); ctx.fill();
+    }
+  }
   // Crown for max level (L10)
   if (spec.crown) {
     ctx.font = `${Math.round(r * 0.75)}px serif`;
@@ -6104,14 +6489,36 @@ function drawTower(t) {
 function drawEnemy(e) {
   const bob = Math.sin(e.wobble) * 2;
   const r = state.tileSize * (e.boss ? 0.42 : 0.28);
-  // Tint based on active effects: poison = greenish, slow = icy blue. Poison wins if both.
-  // Bosses get a much subtler slow tint (back to their pink) so the slow
-  // looks like it barely sticks — pairs with the lower BOSS_SLOW_RESIST
-  // value in applySlow.
+  const now = state.gameTime || 0;
+  const isStunned = e.stunUntil && now < e.stunUntil;
+  const isMarked = e.markAmount && e.markUntil && now < e.markUntil;
+  // Tint priority: stun > poison > slow. Marked enemies get a purple glow ring
+  // (drawn separately below) rather than a tint, so it stacks with others.
   let bg = e.boss ? '#FFD6D6' : 'white';
-  if (e.dotTicksLeft > 0) bg = '#D0F5C8';
+  if (isStunned) bg = '#E1BEE7';   // sleepy purple
+  else if (e.dotTicksLeft > 0) bg = '#D0F5C8';
   else if ((e.slowAmount || 0) > 0) bg = e.boss ? '#FFE0E5' : '#D6EFFF';
   drawEmojiCircle(e.x, e.y + bob, r, bg, e.type.emoji);
+  // Lullaping mark: pulsing purple glow ring around the enemy. The glow
+  // strength scales with the mark amount so a higher-level lullaping reads
+  // as visibly stronger.
+  if (isMarked) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
+    ctx.strokeStyle = `rgba(126,87,194,${0.4 + pulse * 0.3})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(e.x, e.y + bob, r + 5 + pulse * 2, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Stunned: floating Z's above the enemy. Animated by performance.now()
+  // so they bob even when game time is paused/slowed.
+  if (isStunned) {
+    const zBob = Math.sin(performance.now() * 0.005) * 2;
+    ctx.fillStyle = '#4527A0';
+    ctx.font = `bold ${Math.round(r * 0.6)}px Fredoka, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Z', e.x + r * 0.5, e.y - r - 4 + zBob);
+    ctx.font = `bold ${Math.round(r * 0.4)}px Fredoka, sans-serif`;
+    ctx.fillText('z', e.x + r * 0.9, e.y - r - 10 + zBob * 0.7);
+  }
   // Slow aura ring — bosses get a dimmer outline (40% the alpha) so the
   // ring barely glows. Same color so it's still recognizable as an ice
   // effect, just visibly resisted.
@@ -6296,6 +6703,11 @@ function openTowerPopup(tower) {
         ${current.slow != null ? statRow('🐌 SLOW', Math.round(current.slow * 100), next ? Math.round(next.slow * 100) : null, '%') : ''}
         ${current.dotPct ? statRow('☠️ POISON', `${Math.round(current.dotPct * 100)}% × ${current.dotTicks}`, next ? `${Math.round(next.dotPct * 100)}% × ${next.dotTicks}` : null) : ''}
         ${current.chainHops ? statRow('🍦 CHAIN', `${current.chainHops + 1} hits`, next ? `${next.chainHops + 1} hits` : null) : ''}
+        ${current.charge ? statRow('😡 CHARGE', `${(current.fireRate/1000).toFixed(1)}s`, next ? `${(next.fireRate/1000).toFixed(1)}s` : null) : ''}
+        ${current.support ? statRow('😊 BUFF', `+${Math.round(current.buff * 100)}%`, next ? `+${Math.round(next.buff * 100)}%` : null) : ''}
+        ${current.stunChance ? statRow('😴 STUN', `${Math.round(current.stunChance * 100)}%`, next ? `${Math.round(next.stunChance * 100)}%` : null) : ''}
+        ${current.pierce ? statRow('⚡ PIERCE', 'line', next ? 'line' : null) : ''}
+        ${current.mark ? statRow('🌙 MARK', `+${Math.round(current.mark * 100)}%`, next ? `+${Math.round(next.mark * 100)}%` : null) : ''}
       </div>
       <div style="margin-bottom:10px;">
         <div style="font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:#4A3D4C;margin-bottom:4px;">🎯 TARGET</div>
@@ -6412,6 +6824,11 @@ function ownedTowerKeys() {
   if (r.cannon) keys.push('cannon');
   if (r.heartsping) keys.push('heartsping');
   if (r.shashaping) keys.push('shashaping');
+  if (r.diaping) keys.push('diaping');
+  if (r.joyping) keys.push('joyping');
+  if (r.sleeping) keys.push('sleeping');
+  if (r.sparkling) keys.push('sparkling');
+  if (r.lullaping) keys.push('lullaping');
   return keys;
 }
 
@@ -7371,6 +7788,36 @@ function showBossRewardPicker(isRefight, onDone) {
       desc: 'Ice-cream chain shots that bounce between monsters and chill each one.',
       available: !isRefight && !r.shashaping,
       ownedNote: r.shashaping ? 'Already unlocked' : '',
+    },
+    {
+      key: 'diaping', emoji: '😡', name: 'Diaping Tower',
+      desc: 'Rage artillery — charges up over a few seconds, then BOOM: huge AOE burst.',
+      available: !isRefight && !r.diaping,
+      ownedNote: r.diaping ? 'Already unlocked' : '',
+    },
+    {
+      key: 'joyping', emoji: '😊', name: 'Joyping Tower',
+      desc: 'Support aura — doesn\'t attack, but boosts adjacent towers\' fire rate.',
+      available: !isRefight && !r.joyping,
+      ownedNote: r.joyping ? 'Already unlocked' : '',
+    },
+    {
+      key: 'sleeping', emoji: '😴', name: 'Sleeping Tower',
+      desc: 'Stun-on-hit chance. The only tower that can briefly halt a boss.',
+      available: !isRefight && !r.sleeping,
+      ownedNote: r.sleeping ? 'Already unlocked' : '',
+    },
+    {
+      key: 'sparkling', emoji: '⚡', name: 'Sparkling Tower',
+      desc: 'Lightning beam pierces through every monster in a straight line.',
+      available: !isRefight && !r.sparkling,
+      ownedNote: r.sparkling ? 'Already unlocked' : '',
+    },
+    {
+      key: 'lullaping', emoji: '🌙', name: 'Lullaping Tower',
+      desc: 'Marks monsters — they take +25–60% extra damage from ALL towers for 2s.',
+      available: !isRefight && !r.lullaping,
+      ownedNote: r.lullaping ? 'Already unlocked' : '',
     },
     {
       key: 'extraCoins', emoji: '💰', name: '+30 Starting Coins',
@@ -8434,6 +8881,17 @@ function renderAdminEdit(username, email) {
           <label><input type="checkbox" data-edit-key="heartsping" data-track="${rKey}" ${r.heartsping?'checked':''}> Heartsping tower</label>
           <label><input type="checkbox" data-edit-key="shashaping" data-track="${rKey}" ${r.shashaping?'checked':''}> Shashaping tower</label>
         </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="diaping" data-track="${rKey}" ${r.diaping?'checked':''}> Diaping tower</label>
+          <label><input type="checkbox" data-edit-key="joyping" data-track="${rKey}" ${r.joyping?'checked':''}> Joyping tower</label>
+        </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="sleeping" data-track="${rKey}" ${r.sleeping?'checked':''}> Sleeping tower</label>
+          <label><input type="checkbox" data-edit-key="sparkling" data-track="${rKey}" ${r.sparkling?'checked':''}> Sparkling tower</label>
+        </div>
+        <div class="admin-row">
+          <label><input type="checkbox" data-edit-key="lullaping" data-track="${rKey}" ${r.lullaping?'checked':''}> Lullaping tower</label>
+        </div>
       </div>
     `;
   }).join('');
@@ -8471,6 +8929,7 @@ async function doAdminSave() {
             extraLivesClaims: 0, extraCoinsClaims: 0,
             fire: false, ice: false, poison: false, cannon: false,
             heartsping: false, shashaping: false,
+            diaping: false, joyping: false, sleeping: false, sparkling: false, lullaping: false,
             claimed: {}, livesPool: STARTING_LIVES_POOL, livesPoolUpdatedAt: Date.now(),
           };
         } else {
